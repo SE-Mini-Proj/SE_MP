@@ -18,8 +18,14 @@ if (process.env.NODE_ENV !== 'test') {
 }
 
 // Graceful shutdown handling
-function handleShutdown(signal) {
-  console.log(`\n[Server] Received ${signal}. Closing HTTP and WebSocket connections...`);
+async function handleShutdown(signal) {
+  console.log(`\n[Server] Received ${signal}. Closing HTTP, WebSocket, and Database connections...`);
+  try {
+    const { closePool } = require('./db');
+    await closePool();
+  } catch (err) {
+    console.error('[Server Error] Error closing database pool:', err);
+  }
   server.close(() => {
     console.log('[Server] Server shut down gracefully.');
     process.exit(0);
