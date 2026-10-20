@@ -12,11 +12,16 @@ const config = {
     expiresIn: process.env.JWT_EXPIRES_IN || '24h',
   },
   database: {
+    connectionString: process.env.DATABASE_URL,
     host: process.env.DB_HOST || 'localhost',
     port: parseInt(process.env.DB_PORT, 10) || 5432,
     name: process.env.DB_NAME || 'chat_db',
     user: process.env.DB_USER || 'postgres',
     password: process.env.DB_PASSWORD || 'postgres',
+    maxPoolSize: parseInt(process.env.DB_POOL_MAX, 10) || 20,
+    idleTimeoutMillis: parseInt(process.env.DB_IDLE_TIMEOUT, 10) || 30000,
+    connectionTimeoutMillis: parseInt(process.env.DB_CONN_TIMEOUT, 10) || 5000,
+    ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : false,
   },
   redis: {
     host: process.env.REDIS_HOST || 'localhost',
