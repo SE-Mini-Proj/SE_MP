@@ -1,0 +1,14 @@
+config:
+  target: http://localhost:3000
+  phases:
+    - duration: 60
+      arrivalRate: 10
+      name: Steady health endpoint traffic
+  ensure:
+    p95: 500
+    p99: 1000
+scenarios:
+  - name: Health endpoint
+    flow:
+      - get:
+          url: /api/health

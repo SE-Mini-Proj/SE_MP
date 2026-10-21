@@ -1,6 +1,6 @@
-import { describe, it, expect } from 'vitest';
-import request from 'supertest';
-import app from '../src/app';
+const { describe, it, expect } = require('@jest/globals');
+const request = require('supertest');
+const app = require('../src/app');
 
 describe('REST API - Health & Status Endpoints', () => {
   it('GET / should serve the client html interface', async () => {

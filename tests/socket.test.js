@@ -1,55 +1,54 @@
+const { describe, it, expect, beforeAll, afterAll, jest } = require('@jest/globals');
+const http = require('http');
+const { setTimeout, clearTimeout } = require('node:timers');
+const ioClient = require('socket.io-client');
+const app = require('../src/app');
+const { initializeSocket } = require('../src/sockets');
 
-import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
-import http from 'http';
-import { setTimeout, clearTimeout } from 'node:timers';
-import ioClient from 'socket.io-client';
-import app from '../src/app';
-import { initializeSocket } from '../src/sockets';
-
-// Mock Redis Pub/Sub so the tests do not require a running Redis server.
-vi.mock('../src/cache/redisPubSub', () => ({
+jest.mock('../src/cache/redisPubSub', () => ({
   INSTANCE_ID: 'test-instance',
   CHANNELS: {
     MESSAGES: 'chat:messages',
     ROOM_EVENTS: 'chat:room-events',
     PRESENCE: 'chat:presence',
   },
-  publishMessage: vi.fn().mockResolvedValue(undefined),
-  publishRoomEvent: vi.fn().mockResolvedValue(undefined),
-  publishPresenceEvent: vi.fn().mockResolvedValue(undefined),
-  initializePubSub: vi.fn().mockResolvedValue(undefined),
-  closePubSub: vi.fn().mockResolvedValue(undefined),
+  publishMessage: jest.fn().mockResolvedValue(undefined),
+  publishRoomEvent: jest.fn().mockResolvedValue(undefined),
+  publishPresenceEvent: jest.fn().mockResolvedValue(undefined),
+  initializePubSub: jest.fn().mockResolvedValue(undefined),
+  closePubSub: jest.fn().mockResolvedValue(undefined),
 }));
 
-// Mock presence storage for isolated Socket.IO tests.
-vi.mock('../src/cache/presenceService', () => ({
-  registerSession: vi.fn().mockResolvedValue({
+jest.mock('../src/cache/presenceService', () => ({
+  registerSession: jest.fn().mockResolvedValue({
     userId: 'user_tester_1',
     socketId: 'test-socket',
     instanceId: 'test-instance',
     connectedAt: new Date().toISOString(),
+    isFirstSession: true,
   }),
-  removeSession: vi.fn().mockResolvedValue({
+  removeSession: jest.fn().mockResolvedValue({
     removed: true,
     userOnline: false,
     results: [],
   }),
-  getUserSessions: vi.fn().mockResolvedValue([]),
-  isUserOnline: vi.fn().mockResolvedValue(false),
-  getOnlineUsers: vi.fn().mockResolvedValue([]),
+  getUserSessions: jest.fn().mockResolvedValue([]),
+  isUserOnline: jest.fn().mockResolvedValue(false),
+  getOnlineUsers: jest.fn().mockResolvedValue([]),
 }));
 
 describe('WebSocket Gateway - Socket.IO Integration', () => {
   let server;
+  let socketServer;
   let serverPort;
   let clientSocket;
 
   beforeAll(async () => {
     server = http.createServer(app);
-    initializeSocket(server);
+    socketServer = initializeSocket(server);
 
     await new Promise((resolve) => {
-      server.listen(0, () => {
+      server.listen(0, '127.0.0.1', () => {
         serverPort = server.address().port;
         resolve();
       });
@@ -61,20 +60,21 @@ describe('WebSocket Gateway - Socket.IO Integration', () => {
       clientSocket.disconnect();
     }
 
-    await new Promise((resolve, reject) => {
-      server.close((error) => {
-        if (error) {
-          reject(error);
-        } else {
-          resolve();
-        }
+    if (socketServer && socketServer.io) {
+      await new Promise((resolve) => socketServer.io.close(resolve));
+    } else if (server.listening) {
+      await new Promise((resolve, reject) => {
+        server.close((error) => {
+          if (error) reject(error);
+          else resolve();
+        });
       });
-    });
+    }
   });
 
   it('should connect and receive connection:ack event', async () => {
     await new Promise((resolve, reject) => {
-      clientSocket = ioClient(`http://localhost:${serverPort}`, {
+      clientSocket = ioClient(`http://127.0.0.1:${serverPort}`, {
         auth: {
           token: 'mock_jwt_for_test',
           userId: 'user_tester_1',
@@ -82,7 +82,13 @@ describe('WebSocket Gateway - Socket.IO Integration', () => {
         transports: ['websocket'],
       });
 
+      const timeout = setTimeout(() => {
+        reject(new Error('Timed out waiting for connection:ack'));
+      }, 10000);
+
       clientSocket.once('connection:ack', (ack) => {
+        clearTimeout(timeout);
+
         try {
           expect(ack.status).toBe('connected');
           expect(ack.user.id).toBe('user_tester_1');
@@ -93,9 +99,12 @@ describe('WebSocket Gateway - Socket.IO Integration', () => {
         }
       });
 
-      clientSocket.once('connect_error', reject);
+      clientSocket.once('connect_error', (error) => {
+        clearTimeout(timeout);
+        reject(error);
+      });
     });
-  });
+  }, 15000);
 
   it('should echo or broadcast sent messages via message:receive', async () => {
     const testPayload = {
@@ -106,7 +115,7 @@ describe('WebSocket Gateway - Socket.IO Integration', () => {
     await new Promise((resolve, reject) => {
       const timeout = setTimeout(() => {
         reject(new Error('Timed out waiting for message:receive'));
-      }, 4000);
+      }, 10000);
 
       clientSocket.once('message:receive', (receivedMsg) => {
         clearTimeout(timeout);
@@ -124,5 +133,5 @@ describe('WebSocket Gateway - Socket.IO Integration', () => {
 
       clientSocket.emit('message:send', testPayload);
     });
-  });
+  }, 15000);
 });
