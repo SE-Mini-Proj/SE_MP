@@ -1,6 +1,6 @@
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { setTimeout, clearTimeout } from 'node:timers';
-import { createClient } from 'redis';
+const { describe, it, expect, beforeAll, afterAll } = require('@jest/globals');
+const { setTimeout, clearTimeout } = require('node:timers');
+const { createClient } = require('redis');
 
 describe('Redis Pub/Sub Integration (Issue #3)', () => {
   let publisher;

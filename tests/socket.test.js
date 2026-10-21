@@ -1,4 +1,4 @@
-const { describe, it, expect, beforeAll, afterAll, jest } = require('@jest/globals');
+const { describe, it, expect, beforeAll, afterAll } = require('@jest/globals');
 const http = require('http');
 const { setTimeout, clearTimeout } = require('node:timers');
 const ioClient = require('socket.io-client');
