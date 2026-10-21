@@ -8,12 +8,13 @@ const { initializeSocket } = require('../src/sockets');
 
 describe('Security Requirement: TLS 1.2+ Transport Security (Issue #6 - CHAT-SR-001, TC-Sec-01)', () => {
   let server;
-  let socketServer;
+  let ioInstance;
   let serverPort;
 
   beforeAll(async () => {
     server = http.createServer(app);
-    socketServer = initializeSocket(server);
+    const result = initializeSocket(server);
+    ioInstance = result.io || result;
 
     await new Promise((resolve) => {
       server.listen(0, () => {
@@ -25,8 +26,8 @@ describe('Security Requirement: TLS 1.2+ Transport Security (Issue #6 - CHAT-SR-
 
   afterAll(async () => {
     config.tls.enforce = false;
-    if (socketServer) {
-      await new Promise((resolve) => socketServer.close(resolve));
+    if (ioInstance) {
+      await new Promise((resolve) => ioInstance.close(resolve));
     }
   });
 

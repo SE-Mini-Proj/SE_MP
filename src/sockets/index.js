@@ -2,6 +2,9 @@ const { Server } = require('socket.io');
 const config = require('../config');
 const registerMessageHandler = require('./handlers/messageHandler');
 const registerPresenceHandler = require('./handlers/presenceHandler');
+const {
+  CHANNELS,
+} = require('../cache/redisPubSub');
 
 function initializeSocket(httpServer) {
   const io = new Server(httpServer, {
@@ -14,7 +17,6 @@ function initializeSocket(httpServer) {
     pingInterval: 25000,
   });
 
-  // Connection Handshake Middleware
   io.use((socket, next) => {
     // TLS Enforcement for WebSockets (Issue #6, CHAT-SR-001)
     const isEnforced = Boolean(config.tls?.enforce);
@@ -29,10 +31,14 @@ function initializeSocket(httpServer) {
       return next(err);
     }
 
-    const token = socket.handshake.auth?.token || socket.handshake.headers?.authorization;
-    const userId = socket.handshake.auth?.userId || socket.handshake.query?.userId;
+    const token =
+      socket.handshake.auth?.token ||
+      socket.handshake.headers?.authorization;
 
-    // Attach user information to socket context
+    const userId =
+      socket.handshake.auth?.userId ||
+      socket.handshake.query?.userId;
+
     socket.user = {
       id: userId || `user_${socket.id.substring(0, 6)}`,
       authenticated: Boolean(token),
@@ -41,12 +47,51 @@ function initializeSocket(httpServer) {
     next();
   });
 
-  io.on('connection', (socket) => {
-    if (config.nodeEnv !== 'test') {
-      console.log(`[WebSocket] Client connected: ${socket.id} (User: ${socket.user.id})`);
+  async function handleRedisEvent(channel, event) {
+    if (channel === CHANNELS.MESSAGES) {
+      // Ignore messages published by this instance.
+      // Its message handler already broadcasts them locally.
+      if (event.originInstanceId === require('../cache/redisPubSub').INSTANCE_ID) {
+        return;
+      }
+
+      if (event.roomId) {
+        io.to(event.roomId).emit('message:receive', event);
+      } else {
+        io.emit('message:receive', event);
+      }
+
+      return;
     }
 
-    // Acknowledge connection
+    if (channel === CHANNELS.ROOM_EVENTS) {
+      if (!event.eventName || !event.payload) {
+        return;
+      }
+
+      if (event.roomId) {
+        io.to(event.roomId).emit(event.eventName, event.payload);
+      }
+
+      return;
+    }
+
+    if (channel === CHANNELS.PRESENCE) {
+      if (!event.eventName || !event.payload) {
+        return;
+      }
+
+      io.emit(event.eventName, event.payload);
+    }
+  }
+
+  io.on('connection', (socket) => {
+    if (config.nodeEnv !== 'test') {
+      console.log(
+        `[WebSocket] Client connected: ${socket.id} (User: ${socket.user.id})`
+      );
+    }
+
     socket.emit('connection:ack', {
       status: 'connected',
       socketId: socket.id,
@@ -54,18 +99,16 @@ function initializeSocket(httpServer) {
       timestamp: new Date().toISOString(),
     });
 
-    // Broadcast user online event
-    socket.broadcast.emit('user:online', {
-      userId: socket.user.id,
-      timestamp: new Date().toISOString(),
-    });
-
-    // Register event modules
+    // Register message and presence handlers.
+    // The presence handler automatically registers the session.
     registerMessageHandler(io, socket);
     registerPresenceHandler(io, socket);
   });
 
-  return io;
+  return {
+    io,
+    handleRedisEvent,
+  };
 }
 
 module.exports = { initializeSocket };
