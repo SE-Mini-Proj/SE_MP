@@ -26,11 +26,13 @@ export default [
     files: ['tests/**/*.js', '*.mjs'],
     languageOptions: {
       ecmaVersion: 2022,
-      sourceType: 'module',
+      sourceType: 'commonjs',
       globals: {
         node: true,
         process: 'readonly',
         console: 'readonly',
+        require: 'readonly',
+        module: 'readonly',
       },
     },
     rules: {
