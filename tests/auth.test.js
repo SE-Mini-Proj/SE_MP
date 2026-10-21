@@ -1,6 +1,6 @@
-import { describe, it, expect } from 'vitest';
-import { hashPassword, verifyPassword, SALT_ROUNDS, registerUser } from '../src/services/authService';
-import UserModel from '../src/models/userModel';
+const { describe, it, expect } = require('@jest/globals');
+const { hashPassword, verifyPassword, SALT_ROUNDS, registerUser } = require('../src/services/authService');
+const UserModel = require('../src/models/userModel');
 
 describe('Security Requirement: Password Hashing with Salt (Issue #7 - CHAT-SR-002, TC-Sec-02)', () => {
   const rawPassword = 'SuperSecretPassword123!';

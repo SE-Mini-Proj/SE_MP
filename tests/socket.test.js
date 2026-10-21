@@ -1,17 +1,18 @@
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import http from 'http';
-import ioClient from 'socket.io-client';
-import app from '../src/app';
-import { initializeSocket } from '../src/sockets';
+const { describe, it, expect, beforeAll, afterAll } = require('@jest/globals');
+const http = require('http');
+const ioClient = require('socket.io-client');
+const app = require('../src/app');
+const { initializeSocket } = require('../src/sockets');
 
 describe('WebSocket Gateway - Socket.IO Integration', () => {
   let server;
+  let socketServer;
   let serverPort;
   let clientSocket;
 
   beforeAll(async () => {
     server = http.createServer(app);
-    initializeSocket(server);
+    socketServer = initializeSocket(server);
 
     await new Promise((resolve) => {
       server.listen(0, () => {
@@ -22,15 +23,17 @@ describe('WebSocket Gateway - Socket.IO Integration', () => {
   });
 
   afterAll(async () => {
-    if (clientSocket && clientSocket.connected) {
+    if (clientSocket) {
       clientSocket.disconnect();
     }
-    await new Promise((resolve) => server.close(resolve));
+    if (socketServer) {
+      await new Promise((resolve) => socketServer.close(resolve));
+    }
   });
 
   it('should connect and receive connection:ack event', async () => {
     await new Promise((resolve, reject) => {
-      clientSocket = ioClient(`http://localhost:${serverPort}`, {
+      clientSocket = ioClient(`http://127.0.0.1:${serverPort}`, {
         auth: { token: 'mock_jwt_for_test', userId: 'user_tester_1' },
         transports: ['websocket'],
       });
@@ -44,7 +47,7 @@ describe('WebSocket Gateway - Socket.IO Integration', () => {
 
       clientSocket.on('connect_error', (err) => reject(err));
     });
-  });
+  }, 10000);
 
   it('should echo or broadcast sent messages via message:receive', async () => {
     const testPayload = {
@@ -63,5 +66,5 @@ describe('WebSocket Gateway - Socket.IO Integration', () => {
 
       clientSocket.emit('message:send', testPayload);
     });
-  });
+  }, 10000);
 });

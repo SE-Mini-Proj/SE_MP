@@ -6,8 +6,11 @@
   "scripts": {
     "start": "node src/server.js",
     "dev": "nodemon src/server.js",
-    "test": "vitest run",
-    "test:watch": "vitest",
+    "test": "jest --runInBand",
+    "test:watch": "jest --watch",
+    "test:unit": "jest tests/services.test.js --runInBand",
+    "test:integration": "jest tests/db.test.js tests/health.test.js tests/socket.test.js --runInBand",
+    "test:load": "artillery run tests/performance/http-load.yml && artillery run tests/performance/socket-load.yml",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "build": "node -e \"console.log('Build verification complete')\"",
@@ -41,10 +44,11 @@
     "socket.io": "^4.8.4"
   },
   "devDependencies": {
+    "artillery": "^2.0.25",
     "eslint": "^9.22.0",
-    "nodemon": "^1.14.10",
+    "jest": "^29.7.0",
+    "nodemon": "^3.1.14",
     "socket.io-client": "^4.8.4",
-    "supertest": "^7.3.1",
-    "vitest": "^5.0.5"
+    "supertest": "^7.3.1"
   }
 }

@@ -1,0 +1,17 @@
+config:
+  target: http://localhost:3000
+  phases:
+    - duration: 60
+      arrivalRate: 10
+      name: Steady Socket.IO traffic
+  engines:
+    socketio: {}
+scenarios:
+  - name: Connect and send a chat message
+    engine: socketio
+    flow:
+      - emit:
+          channel: message:send
+          data:
+            text: Load test message
+            clientMsgId: artillery-load-test
