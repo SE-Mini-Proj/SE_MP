@@ -4,9 +4,13 @@ const path = require('path');
 const config = require('./config');
 const apiRoutes = require('./routes');
 const { requestLogger } = require('./middlewares/loggerMiddleware');
+const { enforceTls } = require('./middlewares/tlsMiddleware');
 const { notFoundHandler, errorHandler } = require('./middlewares/errorMiddleware');
 
 const app = express();
+
+// TLS Enforcement (Issue #6, CHAT-SR-001)
+app.use(enforceTls);
 
 // Standard middlewares
 app.use(cors({ origin: config.clientUrl, credentials: true }));

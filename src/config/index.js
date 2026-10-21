@@ -27,6 +27,10 @@ const config = {
     host: process.env.REDIS_HOST || 'localhost',
     port: parseInt(process.env.REDIS_PORT, 10) || 6379,
   },
+  tls: {
+    enforce: process.env.ENFORCE_TLS === 'true' || process.env.NODE_ENV === 'production',
+    hstsMaxAge: parseInt(process.env.HSTS_MAX_AGE, 10) || 31536000,
+  },
 };
 
 module.exports = config;
