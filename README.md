@@ -21,7 +21,7 @@ A scalable, event-driven real-time chat application built using Node.js, Express
 │   ├── sockets/        # Socket.IO connection handling & event dispatchers
 │   ├── app.js          # Express app configuration & middleware setup
 │   └── server.js       # HTTP server and WebSocket server bootstrapping
-├── tests/              # Unit, integration, and load test suites
+├── tests/              # Jest unit/integration tests and Artillery load scenarios
 ├── public/             # Static assets / testing UI
 ├── .env.example        # Example environment configuration
 ├── package.json
@@ -56,6 +56,28 @@ npm start
 # Run tests
 npm test
 
+# Run service unit tests
+npm run test:unit
+
+# Run REST, database, and Socket.IO integration tests
+npm run test:integration
+
+# Run HTTP and Socket.IO load scenarios (requires the app and Artillery)
+npm run test:load
+
 # Run linter
 npm run lint
 ```
+
+## Test Strategy
+
+Jest runs the service-level unit tests and integration suites. REST endpoint
+tests use Supertest against the Express app without opening a listening port.
+The Socket.IO suite starts an ephemeral HTTP server and connects with the
+Socket.IO client, so it verifies the real handshake and message event flow.
+
+Artillery scenarios in `tests/performance/` exercise `GET /api/health` and
+Socket.IO message delivery. Start the app in a separate terminal before running
+`npm run test:load`; the HTTP scenario enforces p95/p99 latency thresholds of
+500/1000 ms. Both scenarios use a 60-second phase at 10 new virtual users per
+second and can be run individually with `npx artillery run <scenario-file>`.

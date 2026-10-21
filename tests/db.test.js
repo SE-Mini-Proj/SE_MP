@@ -1,11 +1,11 @@
-import { describe, it, expect, afterAll } from 'vitest';
-import fs from 'fs';
-import path from 'path';
-import config from '../src/config';
-import { getPool, checkConnection, closePool } from '../src/db/pool';
-import UserModel from '../src/models/userModel';
-import RoomModel from '../src/models/roomModel';
-import MessageModel from '../src/models/messageModel';
+const { describe, it, expect, afterAll } = require('@jest/globals');
+const fs = require('fs');
+const path = require('path');
+const config = require('../src/config');
+const { getPool, checkConnection, closePool } = require('../src/db/pool');
+const UserModel = require('../src/models/userModel');
+const RoomModel = require('../src/models/roomModel');
+const MessageModel = require('../src/models/messageModel');
 
 describe('Database Schema & PostgreSQL Integration (Issue #2)', () => {
   const migrationsDir = path.join(process.cwd(), 'src', 'db', 'migrations');
