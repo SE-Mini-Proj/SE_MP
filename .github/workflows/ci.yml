@@ -1,0 +1,167 @@
+name: CI Pipeline
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  ci:
+    name: Lint, Migrate, Test and Build
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: chat_db
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d chat_db"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      NODE_ENV: test
+      DB_HOST: localhost
+      DB_PORT: 5432
+      DB_NAME: chat_db
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      DB_SSL: "false"
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/chat_db
+      REDIS_HOST: localhost
+      REDIS_PORT: 6379
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run ESLint
+        run: npm run lint
+
+      - name: Run database migrations
+        run: npm run db:migrate
+
+      - name: Verify database migration
+        run: |
+          node <<'NODE'
+          const { Client } = require('pg');
+
+          async function verify() {
+            const client = new Client({
+              connectionString: process.env.DATABASE_URL
+            });
+
+            try {
+              await client.connect();
+
+              const result = await client.query(`
+                SELECT table_name
+                FROM information_schema.tables
+                WHERE table_schema = 'public'
+                  AND table_name IN (
+                    'users',
+                    'rooms',
+                    'room_members',
+                    'messages',
+                    'schema_migrations'
+                  )
+                ORDER BY table_name
+              `);
+
+              const expected = [
+                'messages',
+                'room_members',
+                'rooms',
+                'schema_migrations',
+                'users'
+              ];
+
+              const actual = result.rows.map(row => row.table_name);
+
+              console.log('Tables found:', actual);
+
+              if (JSON.stringify(actual) !== JSON.stringify(expected)) {
+                throw new Error('Database migration verification failed');
+              }
+
+              console.log('Database migration verification passed.');
+            } finally {
+              await client.end();
+            }
+          }
+
+          verify().catch(error => {
+            console.error(error);
+            process.exitCode = 1;
+          });
+          NODE
+
+      - name: Verify Redis availability
+        run: |
+          node <<'NODE'
+          const { createClient } = require('redis');
+
+          async function verifyRedis() {
+            const client = createClient({
+              socket: {
+                host: process.env.REDIS_HOST,
+                port: Number(process.env.REDIS_PORT),
+              },
+            });
+
+            client.on('error', (error) => {
+              console.error('Redis error:', error.message);
+            });
+
+            try {
+              await client.connect();
+              console.log('Redis connection successful.');
+            } finally {
+              if (client.isOpen) {
+                await client.quit();
+              }
+            }
+          }
+
+          verifyRedis().catch((error) => {
+            console.error(error);
+            process.exitCode = 1;
+          });
+          NODE
+
+      - name: Run automated tests
+        run: npm test
+
+      - name: Build verification
+        run: npm run build
