@@ -1,21 +1,26 @@
+const { sanitizeMessage } = require('../utils/sanitizer');
+
 /**
- * Messaging Service Skeleton
- * Validates message payloads, persists messages, and prepares them for broadcast.
+ * Messaging Service
+ * Validates, sanitizes (XSS prevention - CHAT-SR-004), persists messages, and prepares them for broadcast.
  */
 async function processMessage({ roomId, text, senderId, clientMsgId }) {
-  if (!text || text.trim() === '') {
+  if (typeof text !== 'string' || text.trim() === '') {
     const error = new Error('Message text cannot be empty');
     error.code = 'EMPTY_MESSAGE';
     error.status = 400;
     throw error;
   }
 
+  // Server-side sanitization to mitigate XSS (CHAT-SR-004, SAD §3.7)
+  const sanitizedText = sanitizeMessage(text);
+
   const message = {
     messageId: 'msg_' + Date.now(),
     clientMsgId: clientMsgId || null,
     roomId: roomId || null,
     senderId: senderId || 'anonymous',
-    text: text.trim(),
+    text: sanitizedText,
     timestamp: new Date().toISOString(),
   };
 

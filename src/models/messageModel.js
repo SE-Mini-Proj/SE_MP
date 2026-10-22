@@ -1,4 +1,5 @@
 const db = require('../db');
+const { sanitizeMessage } = require('../utils/sanitizer');
 
 /**
  * Message Model & Database Repository
@@ -16,12 +17,13 @@ class MessageModel {
   }
 
   static async create({ roomId = null, senderId, recipientId = null, content, delivered = false }) {
+    const safeContent = sanitizeMessage(content);
     const queryText = `
       INSERT INTO messages (room_id, sender_id, recipient_id, content, delivered)
       VALUES ($1, $2, $3, $4, $5)
       RETURNING id, room_id, sender_id, recipient_id, content, delivered, created_at;
     `;
-    const res = await db.query(queryText, [roomId, senderId, recipientId, content, delivered]);
+    const res = await db.query(queryText, [roomId, senderId, recipientId, safeContent, delivered]);
     return new MessageModel(res.rows[0]);
   }
 
