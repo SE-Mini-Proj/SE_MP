@@ -232,7 +232,7 @@
       const msgDiv = document.createElement('div');
       msgDiv.className = `message ${isOwn ? 'own' : ''}`;
       const timeStr = time ? new Date(time).toLocaleTimeString() : 'Now';
-      msgDiv.innerHTML = `<div class="meta">${sender} • ${timeStr}</div>${escapeHtml(text)}`;
+      msgDiv.innerHTML = `<div class="meta">${escapeHtml(sender)} • ${timeStr}</div>${escapeHtml(text)}`;
       messagesArea.appendChild(msgDiv);
       messagesArea.scrollTop = messagesArea.scrollHeight;
     }

@@ -5,6 +5,7 @@ const config = require('./config');
 const apiRoutes = require('./routes');
 const { requestLogger } = require('./middlewares/loggerMiddleware');
 const { enforceTls } = require('./middlewares/tlsMiddleware');
+const { xssSanitizerMiddleware } = require('./middlewares/xssMiddleware');
 const { notFoundHandler, errorHandler } = require('./middlewares/errorMiddleware');
 
 const app = express();
@@ -16,6 +17,7 @@ app.use(enforceTls);
 app.use(cors({ origin: config.clientUrl, credentials: true }));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+app.use(xssSanitizerMiddleware);
 app.use(requestLogger);
 
 // Static assets for browser test UI
