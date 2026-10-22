@@ -128,7 +128,37 @@ jobs:
           NODE
 
       - name: Verify Redis availability
-        run: node -e "const { createClient } = require('redis'); (async () => { const client = createClient({ socket: { host: process.env.REDIS_HOST, port: Number(process.env.REDIS_PORT) } }); client.on('error', error => console.error(error.message)); try { await client.connect(); console.log('Redis connection successful'); } finally { if (client.isOpen) await client.quit(); } })().catch(error => { console.error(error); process.exitCode = 1; });"
+        run: |
+          node <<'NODE'
+          const { createClient } = require('redis');
+
+          async function verifyRedis() {
+            const client = createClient({
+              socket: {
+                host: process.env.REDIS_HOST,
+                port: Number(process.env.REDIS_PORT),
+              },
+            });
+
+            client.on('error', (error) => {
+              console.error('Redis error:', error.message);
+            });
+
+            try {
+              await client.connect();
+              console.log('Redis connection successful.');
+            } finally {
+              if (client.isOpen) {
+                await client.quit();
+              }
+            }
+          }
+
+          verifyRedis().catch((error) => {
+            console.error(error);
+            process.exitCode = 1;
+          });
+          NODE
 
       - name: Run automated tests
         run: npm test
