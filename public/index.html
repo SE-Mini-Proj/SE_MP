@@ -3,280 +3,419 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Chat App - WebSocket Test Client</title>
-  <style>
-    :root {
-      --bg-color: #0f172a;
-      --card-bg: #1e293b;
-      --border-color: #334155;
-      --primary: #3b82f6;
-      --primary-hover: #2563eb;
-      --text-main: #f8fafc;
-      --text-muted: #94a3b8;
-      --success: #10b981;
-      --danger: #ef4444;
-    }
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-    }
-    body {
-      background-color: var(--bg-color);
-      color: var(--text-main);
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      min-height: 100vh;
-      padding: 1rem;
-    }
-    .chat-container {
-      background-color: var(--card-bg);
-      border: 1px solid var(--border-color);
-      border-radius: 12px;
-      width: 100%;
-      max-width: 600px;
-      height: 85vh;
-      display: flex;
-      flex-direction: column;
-      overflow: hidden;
-      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.4);
-    }
-    header {
-      padding: 1rem;
-      border-bottom: 1px solid var(--border-color);
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-    .status-badge {
-      font-size: 0.8rem;
-      padding: 0.25rem 0.6rem;
-      border-radius: 9999px;
-      background-color: var(--border-color);
-      color: var(--text-muted);
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
-    .status-dot {
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      background-color: var(--danger);
-    }
-    .status-dot.online {
-      background-color: var(--success);
-    }
-    .room-bar {
-      padding: 0.75rem 1rem;
-      background: rgba(15, 23, 42, 0.5);
-      border-bottom: 1px solid var(--border-color);
-      display: flex;
-      gap: 8px;
-    }
-    .room-bar input {
-      flex: 1;
-      background: #0f172a;
-      border: 1px solid var(--border-color);
-      color: #fff;
-      padding: 0.4rem 0.75rem;
-      border-radius: 6px;
-      font-size: 0.85rem;
-    }
-    .room-bar button {
-      background: var(--primary);
-      color: white;
-      border: none;
-      padding: 0.4rem 0.85rem;
-      border-radius: 6px;
-      cursor: pointer;
-      font-weight: 500;
-    }
-    .messages-area {
-      flex: 1;
-      padding: 1rem;
-      overflow-y: auto;
-      display: flex;
-      flex-direction: column;
-      gap: 0.75rem;
-    }
-    .message {
-      padding: 0.6rem 0.85rem;
-      border-radius: 8px;
-      max-width: 80%;
-      font-size: 0.95rem;
-      line-height: 1.4;
-      background: #334155;
-      align-self: flex-start;
-    }
-    .message.own {
-      background: var(--primary);
-      align-self: flex-end;
-    }
-    .message .meta {
-      font-size: 0.7rem;
-      color: var(--text-muted);
-      margin-bottom: 4px;
-    }
-    .message.own .meta {
-      color: rgba(255, 255, 255, 0.8);
-    }
-    .typing-notice {
-      padding: 0.25rem 1rem;
-      font-size: 0.8rem;
-      font-style: italic;
-      color: var(--text-muted);
-      min-height: 1.5rem;
-    }
-    footer {
-      padding: 0.75rem 1rem;
-      border-top: 1px solid var(--border-color);
-      display: flex;
-      gap: 8px;
-    }
-    footer input {
-      flex: 1;
-      background: #0f172a;
-      border: 1px solid var(--border-color);
-      color: #fff;
-      padding: 0.6rem 0.85rem;
-      border-radius: 8px;
-      font-size: 0.95rem;
-    }
-    footer button {
-      background: var(--primary);
-      color: white;
-      border: none;
-      padding: 0.6rem 1.25rem;
-      border-radius: 8px;
-      cursor: pointer;
-      font-weight: 600;
-      transition: background 0.2s;
-    }
-    footer button:hover {
-      background: var(--primary-hover);
-    }
-  </style>
+  <meta name="description" content="HyperChat - Production Real-Time Chat Application featuring WebSocket gateway, RBAC moderation, TLS 1.2+ encryption, and structured audit logs." />
+  <meta name="theme-color" content="#080c14" />
+  <title>HyperChat • Real-Time Chat App</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/css/style.css" />
 </head>
 <body>
-  <div class="chat-container">
-    <header>
-      <h3>Socket Chat Test Client</h3>
-      <div class="status-badge" id="statusBadge">
-        <span class="status-dot" id="statusDot"></span>
-        <span id="statusText">Connecting...</span>
+  <div id="app-container">
+    <!-- ======================================================================
+         LEFT SIDEBAR: Brand, Persona Switcher, Channels & Contacts
+         ====================================================================== -->
+    <aside class="sidebar" id="leftSidebar" aria-label="Channels and Contacts">
+      <!-- Brand Header -->
+      <div class="sidebar-header">
+        <div class="brand">
+          <div class="brand-icon">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+            </svg>
+          </div>
+          <span class="brand-title">
+            HyperChat
+            <span class="brand-badge">Chat App</span>
+          </span>
+        </div>
       </div>
-    </header>
 
-    <div class="room-bar">
-      <input type="text" id="roomInput" placeholder="Room ID (e.g. general)" value="general" />
-      <button id="joinBtn">Join Room</button>
-    </div>
-
-    <div class="messages-area" id="messagesArea">
-      <div class="message">
-        <div class="meta">System • Now</div>
-        Welcome to the Real-Time Socket Chat test console.
+      <!-- Security Status Bar (CHAT-SR-001, CHAT-SR-004) -->
+      <div class="security-status-bar" id="securityStatusBar">
+        <span class="badge-pill badge-tls" title="CHAT-SR-001: Enforcing TLS 1.2+ (wss:// / https://) transport encryption">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+            <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+          </svg>
+          TLS 1.2+
+        </span>
+        <span class="badge-pill badge-xss" title="CHAT-SR-004: Server-side XSS sanitization and output escaping active">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+          </svg>
+          XSS Safe
+        </span>
       </div>
-    </div>
 
-    <div class="typing-notice" id="typingNotice"></div>
+      <!-- Quick Persona & Role Switcher (RBAC Review Tool) -->
+      <div class="persona-card" id="personaCard">
+        <div class="persona-header">
+          <div class="persona-meta">
+            <div class="avatar" id="personaAvatar">AL</div>
+            <div class="persona-info">
+              <span class="persona-name" id="personaName">Alice (Owner)</span>
+              <span class="persona-email" id="personaEmail">alice.owner@chat.local</span>
+            </div>
+          </div>
+          <span class="role-tag owner" id="personaRoleTag">OWNER</span>
+        </div>
+        <div>
+          <label for="personaSelect" style="font-size:0.68rem; color:var(--text-muted); display:block; margin-bottom:3px; font-weight:600; text-transform:uppercase;">
+            Switch Test Persona (RBAC):
+          </label>
+          <select id="personaSelect" class="persona-switch-select" title="Switch user persona to test RBAC permissions">
+            <!-- Options dynamically loaded by app.js -->
+          </select>
+        </div>
+      </div>
 
-    <footer>
-      <input type="text" id="msgInput" placeholder="Type a message..." autocomplete="off" />
-      <button id="sendBtn">Send</button>
-    </footer>
+      <!-- Scrollable Navigation (Channels & Direct Messages) -->
+      <div class="sidebar-content">
+        <!-- Channels Section -->
+        <div class="nav-section">
+          <div class="section-title">
+            <span>Channels</span>
+            <button class="section-action-btn" id="createRoomBtn" title="Create a new channel" onclick="window.hyperChat.openCreateRoomModal()">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="12" y1="5" x2="12" y2="19"></line>
+                <line x1="5" y1="12" x2="19" y2="12"></line>
+              </svg>
+            </button>
+          </div>
+          <div id="channelsList">
+            <!-- Dynamic channel items -->
+          </div>
+        </div>
+
+        <!-- Direct Messages Section -->
+        <div class="nav-section">
+          <div class="section-title">
+            <span>Direct Messages</span>
+          </div>
+          <div id="contactsList">
+            <!-- Dynamic contact items -->
+          </div>
+        </div>
+      </div>
+
+      <!-- Sidebar Footer / Connection Status -->
+      <div class="sidebar-footer">
+        <div class="connection-pill">
+          <span class="ping-indicator" id="pingIndicator"></span>
+          <span id="pingLabel">Connecting...</span>
+        </div>
+        <div class="footer-actions">
+          <button class="icon-btn-subtle" id="refreshAuditBtn" title="Refresh Audit Logs" onclick="window.hyperChat.loadAuditLogs()">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="23 4 23 10 17 10"></polyline>
+              <polyline points="1 20 1 14 7 14"></polyline>
+              <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+            </svg>
+          </button>
+          <button class="icon-btn-subtle" id="toggleDrawerBtn" title="Open Room Details & Audit Logs" onclick="window.hyperChat.toggleDrawer()">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+              <line x1="9" y1="3" x2="9" y2="21"></line>
+            </svg>
+          </button>
+        </div>
+      </div>
+    </aside>
+
+    <!-- ======================================================================
+         MAIN CHAT PANE: Header, Message Feed, Typing Indicator, Composer
+         ====================================================================== -->
+    <main class="chat-main" id="chatMain">
+      <!-- Chat Header -->
+      <header class="chat-header">
+        <div class="chat-title-group">
+          <button class="btn-mobile-menu" id="mobileMenuBtn" aria-label="Open navigation menu" onclick="window.hyperChat.toggleSidebar()">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="3" y1="12" x2="21" y2="12"></line>
+              <line x1="3" y1="6" x2="21" y2="6"></line>
+              <line x1="3" y1="18" x2="21" y2="18"></line>
+            </svg>
+          </button>
+          <div class="chat-title-text">
+            <h1 class="chat-room-name" id="chatRoomName"># general</h1>
+            <span class="chat-room-topic" id="chatRoomTopic">Global team discussion and updates</span>
+          </div>
+        </div>
+
+        <div class="chat-header-actions">
+          <button class="header-btn highlight" id="headerAuditBtn" title="View Moderation Audit Logs" onclick="window.hyperChat.setDrawerTab('audit'); window.hyperChat.toggleDrawer();">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+              <polyline points="14 2 14 8 20 8"></polyline>
+              <line x1="16" y1="13" x2="8" y2="13"></line>
+              <line x1="16" y1="17" x2="8" y2="17"></line>
+              <polyline points="10 9 9 9 8 9"></polyline>
+            </svg>
+            Audit Logs
+          </button>
+          <button class="header-btn" id="headerMembersBtn" title="View Members & Moderation" onclick="window.hyperChat.setDrawerTab('members'); window.hyperChat.toggleDrawer();">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+              <circle cx="9" cy="7" r="4"></circle>
+              <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+              <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+            </svg>
+            Members
+          </button>
+        </div>
+      </header>
+
+      <!-- Message History Stream / Feed -->
+      <section class="messages-container" id="messagesContainer" aria-label="Message Feed" role="log">
+        <!-- Messages rendered dynamically -->
+      </section>
+
+      <!-- Real-Time Typing Notice Banner (CHAT-F-031) -->
+      <div class="typing-banner" id="typingBanner" aria-live="polite">
+        <!-- Animated typing indicator -->
+      </div>
+
+      <!-- Chat Composer (Input, XSS tester, Send) -->
+      <div class="composer-wrapper">
+        <div class="composer-container">
+          <div class="composer-input-row">
+            <textarea
+              id="composerInput"
+              class="composer-input"
+              rows="1"
+              placeholder="Message #general... (Enter to send, Shift+Enter for new line)"
+              autocomplete="off"
+              aria-label="Type message"
+            ></textarea>
+          </div>
+          <div class="composer-toolbar">
+            <div class="toolbar-left">
+              <button class="tool-btn xss-btn" id="xssTestBtn" title="Insert harmless script tag to demonstrate XSS sanitization (CHAT-SR-004)">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+                </svg>
+                Test XSS Payload
+              </button>
+              <button class="tool-btn" title="Add code formatting" onclick="document.getElementById('composerInput').value += '```\n// code snippet\n```'; document.getElementById('composerInput').focus();">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <polyline points="16 18 22 12 16 6"></polyline>
+                  <polyline points="8 6 2 12 8 18"></polyline>
+                </svg>
+                Code
+              </button>
+            </div>
+            <div class="toolbar-right">
+              <button class="send-btn" id="sendBtn" title="Send message">
+                <span>Send</span>
+                <span class="send-kbd-hint">⏎</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <!-- ======================================================================
+         RIGHT SLIDE-OVER DRAWER: Members, Moderation Actions, Audit Logs
+         ====================================================================== -->
+    <aside class="drawer collapsed" id="sideDrawer" aria-label="Room Details and Moderation">
+      <!-- Drawer Header -->
+      <div class="drawer-header">
+        <h2 class="drawer-title">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="3"></circle>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+          </svg>
+          Room Settings & RBAC
+        </h2>
+        <button class="icon-btn-subtle" title="Close drawer" onclick="window.hyperChat.toggleDrawer()">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </button>
+      </div>
+
+      <!-- Navigation Tabs -->
+      <div class="drawer-tabs">
+        <button class="drawer-tab active" data-tab="members" onclick="window.hyperChat.setDrawerTab('members')">
+          Members & RBAC
+        </button>
+        <button class="drawer-tab" data-tab="audit" onclick="window.hyperChat.setDrawerTab('audit')">
+          Audit Logs
+        </button>
+        <button class="drawer-tab" data-tab="security" onclick="window.hyperChat.setDrawerTab('security')">
+          Security
+        </button>
+      </div>
+
+      <!-- Tab Content Area -->
+      <div class="drawer-content">
+        <!-- 1. Members & Moderation Tab -->
+        <div id="drawerMembersPane">
+          <div style="font-size:0.75rem; color:var(--text-muted); margin-bottom:0.75rem;">
+            Owners and moderators can mute, ban, or kick members. Actions create immutable audit logs.
+          </div>
+          <div id="drawerMembersList" style="display:flex; flex-direction:column; gap:8px;">
+            <!-- Rendered by app.js -->
+          </div>
+        </div>
+
+        <!-- 2. Audit Logs Tab (CHAT-SR-005, TC-Sec-05) -->
+        <div id="drawerAuditPane" style="display:none;">
+          <div class="audit-controls" style="margin-bottom:0.75rem;">
+            <select class="audit-filter-select" id="auditActionFilter" onchange="window.hyperChat.loadAuditLogs()">
+              <option value="ALL">All Actions</option>
+              <option value="MUTE_USER">MUTE_USER</option>
+              <option value="UNMUTE_USER">UNMUTE_USER</option>
+              <option value="BAN_USER">BAN_USER</option>
+              <option value="UNBAN_USER">UNBAN_USER</option>
+              <option value="DELETE_MESSAGE">DELETE_MESSAGE</option>
+              <option value="REMOVE_MEMBER">REMOVE_MEMBER</option>
+            </select>
+            <button class="btn-secondary" style="font-size:0.72rem; padding:0.35rem 0.65rem;" onclick="window.hyperChat.loadAuditLogs()">
+              Refresh
+            </button>
+          </div>
+          <div id="drawerAuditLogsList" style="display:flex; flex-direction:column; gap:8px;">
+            <!-- Rendered by app.js -->
+          </div>
+        </div>
+
+        <!-- 3. Security & Architecture Diagnostics Tab -->
+        <div id="drawerSecurityPane" style="display:none;">
+          <div class="audit-log-card">
+            <h4 style="color:#fff; font-size:0.85rem; margin-bottom:4px;">Transport Security (CHAT-SR-001)</h4>
+            <p style="font-size:0.75rem; color:var(--text-muted); line-height:1.4;">
+              TLS 1.2+ encryption is mandatory. Plaintext <code>ws://</code> and <code>http://</code> connections are rejected via strict middleware validation.
+            </p>
+          </div>
+
+          <div class="audit-log-card">
+            <h4 style="color:#fff; font-size:0.85rem; margin-bottom:4px;">Cross-Site Scripting (CHAT-SR-004)</h4>
+            <p style="font-size:0.75rem; color:var(--text-muted); line-height:1.4;">
+              All incoming messages are sanitized via <code>sanitizeMessage()</code>. HTML tags and malicious event payloads are neutralized safely before broadcast.
+            </p>
+          </div>
+
+          <div class="audit-log-card">
+            <h4 style="color:#fff; font-size:0.85rem; margin-bottom:4px;">Role-Based Access Control (CHAT-SR-005)</h4>
+            <p style="font-size:0.75rem; color:var(--text-muted); line-height:1.4;">
+              Moderation actions are enforced by <code>requireRoomRole([OWNER, ADMIN, MODERATOR])</code>. Unprivileged requests return HTTP 403 Forbidden.
+            </p>
+          </div>
+
+          <div class="audit-log-card">
+            <h4 style="color:#fff; font-size:0.85rem; margin-bottom:4px;">Redis Scalability & Presence</h4>
+            <p style="font-size:0.75rem; color:var(--text-muted); line-height:1.4;">
+              Redis Pub/Sub multiplexes cross-instance messaging and heartbeat presence tracking across concurrent cluster nodes.
+            </p>
+          </div>
+        </div>
+      </div>
+    </aside>
   </div>
 
+  <!-- ======================================================================
+       MODAL DIALOGS
+       ====================================================================== -->
+
+  <!-- 1. Mute User Modal (CHAT-SR-005) -->
+  <div class="modal-backdrop" id="muteModal">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <h3 class="modal-title">Mute Member</h3>
+        <button class="icon-btn-subtle" onclick="window.hyperChat.closeMuteModal()">✕</button>
+      </div>
+      <div class="modal-body">
+        <p style="font-size:0.82rem; color:var(--text-secondary);">
+          Mute <strong id="muteTargetName" style="color:#fff;">User</strong> from posting messages in this room.
+        </p>
+        <div class="form-group">
+          <label class="form-label" for="muteDurationSelect">Duration</label>
+          <select id="muteDurationSelect" class="form-input">
+            <option value="5m">5 Minutes</option>
+            <option value="15m">15 Minutes</option>
+            <option value="1h">1 Hour</option>
+            <option value="24h">24 Hours</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="muteReasonInput">Reason (Recorded in Audit Trail)</label>
+          <input type="text" id="muteReasonInput" class="form-input" placeholder="e.g. Disruptive behavior or excessive spam" value="Disruptive behavior" />
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary" onclick="window.hyperChat.closeMuteModal()">Cancel</button>
+        <button class="btn-primary" onclick="window.hyperChat.confirmMuteUser()">Confirm Mute</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 2. Ban User Modal (CHAT-SR-005) -->
+  <div class="modal-backdrop" id="banModal">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <h3 class="modal-title">Ban Member</h3>
+        <button class="icon-btn-subtle" onclick="window.hyperChat.closeBanModal()">✕</button>
+      </div>
+      <div class="modal-body">
+        <p style="font-size:0.82rem; color:var(--text-secondary);">
+          Are you sure you want to ban <strong id="banTargetName" style="color:#fff;">User</strong>? They will be evicted and prevented from rejoining.
+        </p>
+        <div class="form-group">
+          <label class="form-label" for="banReasonInput">Reason (Recorded in Audit Trail)</label>
+          <input type="text" id="banReasonInput" class="form-input" placeholder="e.g. Severe TOS violation" value="Severe TOS violation" />
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary" onclick="window.hyperChat.closeBanModal()">Cancel</button>
+        <button class="btn-danger" onclick="window.hyperChat.confirmBanUser()">Confirm Ban</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 3. Create Channel Modal (CHAT-F-020) -->
+  <div class="modal-backdrop" id="createRoomModal">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <h3 class="modal-title">Create New Channel</h3>
+        <button class="icon-btn-subtle" onclick="window.hyperChat.closeCreateRoomModal()">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label class="form-label" for="newRoomName">Channel Name</label>
+          <input type="text" id="newRoomName" class="form-input" placeholder="e.g. design-reviews" />
+        </div>
+        <div class="form-group" style="flex-direction:row; align-items:center; gap:8px;">
+          <input type="checkbox" id="newRoomPrivate" style="cursor:pointer;" />
+          <label for="newRoomPrivate" style="font-size:0.82rem; color:var(--text-secondary); cursor:pointer;">
+            Make private (requires invite)
+          </label>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary" onclick="window.hyperChat.closeCreateRoomModal()">Cancel</button>
+        <button class="btn-primary" onclick="window.hyperChat.confirmCreateRoom()">Create Channel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Container -->
+  <div id="toast-container" aria-live="polite"></div>
+
+  <!-- Socket.io client script: loaded from local server with CDN fallback -->
   <script src="/socket.io/socket.io.js"></script>
   <script>
-    const socket = io();
-    const statusDot = document.getElementById('statusDot');
-    const statusText = document.getElementById('statusText');
-    const messagesArea = document.getElementById('messagesArea');
-    const msgInput = document.getElementById('msgInput');
-    const sendBtn = document.getElementById('sendBtn');
-    const roomInput = document.getElementById('roomInput');
-    const joinBtn = document.getElementById('joinBtn');
-    const typingNotice = document.getElementById('typingNotice');
-
-    let currentRoom = 'general';
-    let typingTimeout = null;
-
-    socket.on('connect', () => {
-      statusDot.classList.add('online');
-      statusText.textContent = `Online (${socket.id.substring(0, 5)})`;
-      socket.emit('room:join', { roomId: currentRoom });
-    });
-
-    socket.on('disconnect', () => {
-      statusDot.classList.remove('online');
-      statusText.textContent = 'Disconnected';
-    });
-
-    socket.on('message:receive', (msg) => {
-      addMessage(msg.senderId, msg.text, msg.senderId === socket.id, msg.timestamp);
-    });
-
-    socket.on('typing:update', ({ userId, isTyping, roomId }) => {
-      if (isTyping) {
-        typingNotice.textContent = `${userId} is typing...`;
-      } else {
-        typingNotice.textContent = '';
-      }
-    });
-
-    function addMessage(sender, text, isOwn, time) {
-      const msgDiv = document.createElement('div');
-      msgDiv.className = `message ${isOwn ? 'own' : ''}`;
-      const timeStr = time ? new Date(time).toLocaleTimeString() : 'Now';
-      msgDiv.innerHTML = `<div class="meta">${escapeHtml(sender)} • ${timeStr}</div>${escapeHtml(text)}`;
-      messagesArea.appendChild(msgDiv);
-      messagesArea.scrollTop = messagesArea.scrollHeight;
+    if (typeof io === 'undefined') {
+      const script = document.createElement('script');
+      script.src = 'https://cdn.socket.io/4.8.4/socket.io.min.js';
+      document.head.appendChild(script);
     }
-
-    function escapeHtml(str) {
-      const p = document.createElement('p');
-      p.appendChild(document.createTextNode(str));
-      return p.innerHTML;
-    }
-
-    function sendMessage() {
-      const text = msgInput.value.trim();
-      if (!text) return;
-      socket.emit('message:send', {
-        roomId: currentRoom,
-        text,
-        clientMsgId: crypto.randomUUID ? crypto.randomUUID() : 'id_' + Date.now()
-      });
-      socket.emit('typing:stop', { roomId: currentRoom });
-      msgInput.value = '';
-    }
-
-    sendBtn.addEventListener('click', sendMessage);
-    msgInput.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') {
-        sendMessage();
-      } else {
-        socket.emit('typing:start', { roomId: currentRoom });
-        clearTimeout(typingTimeout);
-        typingTimeout = setTimeout(() => {
-          socket.emit('typing:stop', { roomId: currentRoom });
-        }, 1500);
-      }
-    });
-
-    joinBtn.addEventListener('click', () => {
-      const newRoom = roomInput.value.trim();
-      if (newRoom && newRoom !== currentRoom) {
-        socket.emit('room:leave', { roomId: currentRoom });
-        currentRoom = newRoom;
-        socket.emit('room:join', { roomId: currentRoom });
-        addMessage('System', `Joined room: ${currentRoom}`, false);
-      }
-    });
   </script>
+  <!-- Application Script -->
+  <script src="/js/app.js"></script>
 </body>
 </html>
