@@ -6,6 +6,7 @@ const { getPool, checkConnection, closePool } = require('../src/db/pool');
 const UserModel = require('../src/models/userModel');
 const RoomModel = require('../src/models/roomModel');
 const MessageModel = require('../src/models/messageModel');
+const AuditLogModel = require('../src/models/auditLogModel');
 
 describe('Database Schema & PostgreSQL Integration (Issue #2)', () => {
   const migrationsDir = path.join(process.cwd(), 'src', 'db', 'migrations');
@@ -101,5 +102,47 @@ describe('Database Schema & PostgreSQL Integration (Issue #2)', () => {
     expect(mockMessage.content).toBe('Hello team!');
     expect(mockMessage.delivered).toBe(true);
     expect(mockMessage.roomId).toBe('223e4567-e89b-12d3-a456-426614174000');
+  });
+
+  it('should have 002_moderation_and_audit_logs.up.sql migration file', () => {
+    const upFile = path.join(migrationsDir, '002_moderation_and_audit_logs.up.sql');
+    expect(fs.existsSync(upFile)).toBe(true);
+
+    const sqlContent = fs.readFileSync(upFile, 'utf-8');
+    expect(sqlContent).toContain('CREATE TABLE IF NOT EXISTS audit_logs');
+    expect(sqlContent).toContain('CREATE TABLE IF NOT EXISTS room_bans');
+    expect(sqlContent).toContain('CREATE TABLE IF NOT EXISTS room_mutes');
+    expect(sqlContent).toContain('idx_audit_logs_room_created');
+  });
+
+  it('should have 002_moderation_and_audit_logs.down.sql rollback migration file', () => {
+    const downFile = path.join(migrationsDir, '002_moderation_and_audit_logs.down.sql');
+    expect(fs.existsSync(downFile)).toBe(true);
+
+    const sqlContent = fs.readFileSync(downFile, 'utf-8');
+    expect(sqlContent).toContain('DROP TABLE IF EXISTS audit_logs');
+    expect(sqlContent).toContain('DROP TABLE IF EXISTS room_bans');
+    expect(sqlContent).toContain('DROP TABLE IF EXISTS room_mutes');
+  });
+
+  it('should instantiate AuditLogModel correctly and format JSON', () => {
+    const mockLog = new AuditLogModel({
+      id: '423e4567-e89b-12d3-a456-426614174000',
+      actor_id: '123e4567-e89b-12d3-a456-426614174000',
+      action: 'MUTE_USER',
+      target_type: 'user',
+      target_id: '523e4567-e89b-12d3-a456-426614174000',
+      room_id: '223e4567-e89b-12d3-a456-426614174000',
+      metadata: { reason: 'spamming' },
+      created_at: new Date('2026-10-23T12:00:00Z'),
+    });
+
+    expect(mockLog.action).toBe('MUTE_USER');
+    expect(mockLog.targetType).toBe('user');
+    expect(mockLog.metadata.reason).toBe('spamming');
+
+    const json = mockLog.toJSON();
+    expect(json.id).toBe('423e4567-e89b-12d3-a456-426614174000');
+    expect(json.createdAt).toBe('2026-10-23T12:00:00.000Z');
   });
 });

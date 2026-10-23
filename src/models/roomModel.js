@@ -57,6 +57,39 @@ class RoomModel {
     const res = await db.query(queryText, [roomId]);
     return res.rows;
   }
+
+  static async getMemberRole(roomId, userId) {
+    // Check if user is owner directly on room table
+    const roomRes = await db.query('SELECT owner_id FROM rooms WHERE id = $1 LIMIT 1;', [roomId]);
+    if (roomRes.rows.length > 0 && roomRes.rows[0].owner_id === userId) {
+      return 'owner';
+    }
+
+    const memberRes = await db.query(
+      'SELECT role FROM room_members WHERE room_id = $1 AND user_id = $2 LIMIT 1;',
+      [roomId, userId]
+    );
+    if (memberRes.rows.length > 0) {
+      return memberRes.rows[0].role;
+    }
+
+    return null;
+  }
+
+  static async removeMember({ roomId, userId }) {
+    const queryText = `
+      DELETE FROM room_members
+      WHERE room_id = $1 AND user_id = $2
+      RETURNING room_id, user_id;
+    `;
+    const res = await db.query(queryText, [roomId, userId]);
+    return res.rows.length > 0;
+  }
+
+  static async isMember({ roomId, userId }) {
+    const role = await RoomModel.getMemberRole(roomId, userId);
+    return role !== null;
+  }
 }
 
 module.exports = RoomModel;

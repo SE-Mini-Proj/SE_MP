@@ -76,6 +76,20 @@ class MessageModel {
     if (res.rows.length === 0) return null;
     return new MessageModel(res.rows[0]);
   }
+
+  static async findById(messageId) {
+    const queryText = 'SELECT * FROM messages WHERE id = $1 LIMIT 1;';
+    const res = await db.query(queryText, [messageId]);
+    if (res.rows.length === 0) return null;
+    return new MessageModel(res.rows[0]);
+  }
+
+  static async deleteById(messageId) {
+    const queryText = 'DELETE FROM messages WHERE id = $1 RETURNING *;';
+    const res = await db.query(queryText, [messageId]);
+    if (res.rows.length === 0) return null;
+    return new MessageModel(res.rows[0]);
+  }
 }
 
 module.exports = MessageModel;
