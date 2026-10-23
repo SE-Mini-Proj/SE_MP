@@ -1,3 +1,5 @@
+const { Buffer } = require('buffer');
+
 /**
  * Authentication middleware skeleton
  * Validates Bearer token headers for protected REST endpoints
@@ -29,8 +31,36 @@ function authenticateJWT(req, res, next) {
     });
   }
 
-  // Attach mock authenticated user for skeleton development
-  req.user = { id: 'user_dummy_id', token };
+  // Extract user details from headers or token payload if provided
+  let userId = 'user_dummy_id';
+  let role = 'member';
+
+  if (req.headers['x-user-id']) {
+    userId = req.headers['x-user-id'];
+  }
+  if (req.headers['x-user-role']) {
+    role = req.headers['x-user-role'];
+  }
+
+  // Attempt to parse JWT payload if token is formatted as header.payload.signature
+  if (token && token.includes('.')) {
+    try {
+      const partsArr = token.split('.');
+      if (partsArr.length === 3) {
+        const payload = JSON.parse(Buffer.from(partsArr[1], 'base64').toString('utf8'));
+        if (payload.id || payload.userId) {
+          userId = payload.id || payload.userId;
+        }
+        if (payload.role) {
+          role = payload.role;
+        }
+      }
+    } catch {
+      // Ignore payload decode errors for non-JWT strings
+    }
+  }
+
+  req.user = { id: userId, role, token };
   next();
 }
 
