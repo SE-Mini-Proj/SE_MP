@@ -9,6 +9,7 @@ const {
   SALT_ROUNDS,
   registerUser,
   loginUser,
+  lockoutService,
 } = require('../src/services/authService');
 const UserModel = require('../src/models/userModel');
 
@@ -155,6 +156,10 @@ describe('Functional Requirement: User Authentication & JWT Session Token (Issue
     jest.restoreAllMocks();
   });
 
+  beforeEach(() => {
+    lockoutService.clearAllLockouts();
+  });
+
   it('TC-Auth-02.1: generateToken() creates a valid verifiable JWT with expected user claims', () => {
     const { token, expiresIn } = generateToken(testUser);
 
@@ -267,5 +272,151 @@ describe('Functional Requirement: User Authentication & JWT Session Token (Issue
       expect(res.status).toBe(400);
       expect(res.body.code).toBe('VALIDATION_ERROR');
     });
+  });
+});
+
+describe('Functional Requirement: Account Lockout after Repeated Failed Logins (Issue #13 - CHAT-F-003, TC-Auth-03)', () => {
+  const targetEmail = 'lockout_victim@example.com';
+  const correctPassword = 'StrongPassword123!';
+  let victimUser;
+
+  beforeAll(async () => {
+    const passwordHash = await hashPassword(correctPassword);
+    victimUser = new UserModel({
+      id: 'uuid-victim-13',
+      username: 'lockout_victim',
+      email: targetEmail,
+      password_hash: passwordHash,
+      created_at: new Date(),
+    });
+
+    const originalFindByEmail = UserModel.findByEmail;
+    UserModel.findByEmail = async (email) => {
+      if (email.toLowerCase() === targetEmail.toLowerCase()) {
+        return victimUser;
+      }
+      return originalFindByEmail(email).catch(() => null);
+    };
+  });
+
+  beforeEach(() => {
+    lockoutService.clearAllLockouts();
+  });
+
+  it('TC-Auth-03.1: first 5 consecutive failed attempts return 401 Invalid credentials', async () => {
+    for (let attempt = 1; attempt <= 5; attempt++) {
+      await expect(
+        loginUser({ email: targetEmail, password: 'WrongPassword' })
+      ).rejects.toMatchObject({
+        status: 401,
+        message: 'Invalid credentials',
+      });
+
+      const status = lockoutService.getLockoutStatus(targetEmail);
+      expect(status.failedAttempts).toBe(attempt);
+    }
+  });
+
+  it('TC-Auth-03.2: 6th consecutive failure returns 429 Account Locked', async () => {
+    // Perform 5 failures
+    for (let i = 0; i < 5; i++) {
+      try {
+        await loginUser({ email: targetEmail, password: 'BadPassword' });
+      } catch (err) {
+        expect(err.status).toBe(401);
+      }
+    }
+
+    // 6th attempt must be rejected with 429
+    await expect(
+      loginUser({ email: targetEmail, password: 'BadPassword' })
+    ).rejects.toMatchObject({
+      status: 429,
+      code: 'ACCOUNT_LOCKED',
+      message: expect.stringContaining('Too many attempts'),
+    });
+  });
+
+  it('TC-Auth-03.3: records audit log entry when account lockout occurs', async () => {
+    const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+
+    // Perform 5 failures to trigger lockout
+    for (let i = 0; i < 5; i++) {
+      try {
+        await loginUser({ email: targetEmail, password: 'BadPassword' });
+      } catch {
+        // Expected 401
+      }
+    }
+
+    // Expect console.warn to have logged ACCOUNT_LOCKED audit event
+    const auditLogs = warnSpy.mock.calls
+      .map((call) => call.join(' '))
+      .filter((msg) => msg.includes('ACCOUNT_LOCKED'));
+
+    expect(auditLogs.length).toBeGreaterThan(0);
+    warnSpy.mockRestore();
+  });
+
+  it('TC-Auth-03.4: successful login resets the failed attempts counter', async () => {
+    // Fail 3 times
+    for (let i = 0; i < 3; i++) {
+      try {
+        await loginUser({ email: targetEmail, password: 'BadPassword' });
+      } catch {
+        // Expected
+      }
+    }
+    expect(lockoutService.getLockoutStatus(targetEmail).failedAttempts).toBe(3);
+
+    // Login successfully with correct password
+    const result = await loginUser({ email: targetEmail, password: correctPassword });
+    expect(result.status).toBe('ok');
+
+    // Counter must be reset to 0
+    expect(lockoutService.getLockoutStatus(targetEmail).failedAttempts).toBe(0);
+  });
+
+  it('TC-Auth-03.5: lockout automatically expires after 5 minutes', async () => {
+    // Trigger lockout
+    for (let i = 0; i < 5; i++) {
+      try {
+        await loginUser({ email: targetEmail, password: 'BadPassword' });
+      } catch {
+        // Expected
+      }
+    }
+    expect(lockoutService.getLockoutStatus(targetEmail).isLocked).toBe(true);
+
+    // Advance time past 5 minutes (5 min + 1 second)
+    const realDateNow = Date.now;
+    const futureTime = Date.now() + 5 * 60 * 1000 + 1000;
+    Date.now = () => futureTime;
+
+    try {
+      // Login attempt should now be allowed (not 429)
+      const loginAttempt = await loginUser({ email: targetEmail, password: correctPassword });
+      expect(loginAttempt.status).toBe('ok');
+    } finally {
+      Date.now = realDateNow;
+    }
+  });
+
+  it('TC-Auth-03.6: REST API POST /api/auth/login returns 429 on 6th failed attempt', async () => {
+    for (let i = 0; i < 5; i++) {
+      const res = await request(app)
+        .post('/api/auth/login')
+        .send({ email: targetEmail, password: 'WrongPassword' });
+      expect(res.status).toBe(401);
+    }
+
+    // 6th attempt via HTTP returns 429 Too Many Requests
+    const lockedRes = await request(app)
+      .post('/api/auth/login')
+      .send({ email: targetEmail, password: 'WrongPassword' });
+
+    expect(lockedRes.status).toBe(429);
+    expect(lockedRes.body.code).toBe('ACCOUNT_LOCKED');
+    expect(lockedRes.body.message).toContain('Too many attempts');
   });
 });

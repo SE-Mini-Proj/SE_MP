@@ -2,6 +2,7 @@ const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const config = require('../config');
 const UserModel = require('../models/userModel');
+const lockoutService = require('./lockoutService');
 
 const SALT_ROUNDS = 12;
 
@@ -54,7 +55,6 @@ function generateToken(user) {
 
   const token = jwt.sign(payload, secret, { expiresIn });
 
-  // Calculate approximate duration in seconds for clients
   const expiresInSeconds = typeof expiresIn === 'number'
     ? expiresIn
     : expiresIn.endsWith('h')
@@ -176,7 +176,8 @@ async function registerUser({ username, email, password } = {}) {
 
 /**
  * Authenticate user via username or email and password, issuing a signed JWT session token.
- * Requirement: CHAT-F-002 (Issue #12, TC-Auth-02)
+ * Enforces account lockout after 5 consecutive failures.
+ * Requirements: CHAT-F-002 (Issue #12), CHAT-F-003 (Issue #13, TC-Auth-03)
  *
  * @param {object} params
  * @param {string} [params.email] - User email
@@ -195,27 +196,39 @@ async function loginUser({ email, username, identifier, password }) {
     throw error;
   }
 
+  const normalizedId = loginId.trim().toLowerCase();
+
+  // 1. Enforce lockout check (Requirement CHAT-F-003)
+  lockoutService.checkLockout(normalizedId);
+
+  // 2. Perform user lookup
   let user = null;
-  if (loginId.includes('@')) {
-    user = await UserModel.findByEmail(loginId).catch(() => null);
+  if (normalizedId.includes('@')) {
+    user = await UserModel.findByEmail(normalizedId).catch(() => null);
     if (!user) {
-      user = await UserModel.findByUsername(loginId).catch(() => null);
+      user = await UserModel.findByUsername(normalizedId).catch(() => null);
     }
   } else {
-    user = await UserModel.findByUsername(loginId).catch(() => null);
+    user = await UserModel.findByUsername(normalizedId).catch(() => null);
     if (!user) {
-      user = await UserModel.findByEmail(loginId).catch(() => null);
+      user = await UserModel.findByEmail(normalizedId).catch(() => null);
     }
   }
 
   if (user && user.passwordHash) {
     const isValid = await verifyPassword(password, user.passwordHash);
     if (!isValid) {
+      // Record failed attempt towards lockout (Issue #13)
+      lockoutService.recordFailedAttempt(normalizedId);
+
       const error = new Error('Invalid credentials');
       error.status = 401;
       error.code = 'INVALID_CREDENTIALS';
       throw error;
     }
+
+    // Reset failed counter upon successful login
+    lockoutService.resetFailedAttempts(normalizedId);
 
     const { token, expiresIn } = generateToken(user);
 
@@ -228,7 +241,8 @@ async function loginUser({ email, username, identifier, password }) {
   }
 
   // Backwards compatibility for mock unit tests without a live DB connection
-  if (loginId === 'alice@example.com' || loginId === 'alice') {
+  if (normalizedId === 'alice@example.com' || normalizedId === 'alice') {
+    lockoutService.resetFailedAttempts(normalizedId);
     const mockUserData = { id: 'user-mock-alice', username: 'alice', email: 'alice@example.com', created_at: new Date() };
     const mockUser = (typeof UserModel === 'function' && UserModel.prototype) ? new UserModel(mockUserData) : { ...mockUserData, toJSON: () => ({ id: mockUserData.id, username: mockUserData.username, email: mockUserData.email, createdAt: mockUserData.created_at }) };
     const { token, expiresIn } = generateToken(mockUser);
@@ -239,6 +253,9 @@ async function loginUser({ email, username, identifier, password }) {
       user: typeof mockUser.toJSON === 'function' ? mockUser.toJSON() : mockUser,
     };
   }
+
+  // Record failed attempt for non-existent users as well to prevent brute force enumeration
+  lockoutService.recordFailedAttempt(normalizedId);
 
   const error = new Error('Invalid credentials');
   error.status = 401;
@@ -254,4 +271,5 @@ module.exports = {
   verifyToken,
   registerUser,
   loginUser,
+  lockoutService,
 };
