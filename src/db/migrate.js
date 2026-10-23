@@ -57,6 +57,7 @@ async function runUp() {
           file,
         ]);
         await client.query('COMMIT');
+        applied.push(version);
         console.log(`[Migrate] Successfully applied: ${file}`);
         count++;
       } catch (err) {

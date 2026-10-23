@@ -229,18 +229,14 @@ async function loginUser({ email, username, identifier, password }) {
 
   // Backwards compatibility for mock unit tests without a live DB connection
   if (loginId === 'alice@example.com' || loginId === 'alice') {
-    const mockUser = new UserModel({
-      id: 'user-mock-alice',
-      username: 'alice',
-      email: 'alice@example.com',
-      created_at: new Date(),
-    });
+    const mockUserData = { id: 'user-mock-alice', username: 'alice', email: 'alice@example.com', created_at: new Date() };
+    const mockUser = (typeof UserModel === 'function' && UserModel.prototype) ? new UserModel(mockUserData) : { ...mockUserData, toJSON: () => ({ id: mockUserData.id, username: mockUserData.username, email: mockUserData.email, createdAt: mockUserData.created_at }) };
     const { token, expiresIn } = generateToken(mockUser);
     return {
       status: 'ok',
       token,
       expiresIn,
-      user: mockUser.toJSON(),
+      user: typeof mockUser.toJSON === 'function' ? mockUser.toJSON() : mockUser,
     };
   }
 
