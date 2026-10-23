@@ -1,10 +1,33 @@
-const { describe, it, expect } = require('@jest/globals');
+const { describe, it, expect, beforeEach } = require('@jest/globals');
+
+jest.mock('../src/models/userModel', () => ({
+  findByEmail: jest.fn(),
+  findByUsername: jest.fn(),
+  create: jest.fn(),
+}));
+
+const UserModel = require('../src/models/userModel');
 const { registerUser, loginUser } = require('../src/services/authService');
 const { createRoom, joinRoom } = require('../src/services/roomService');
 const { processMessage } = require('../src/services/messagingService');
 
 describe('Auth service', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    UserModel.findByEmail.mockResolvedValue(null);
+    UserModel.findByUsername.mockResolvedValue(null);
+  });
+
   it('returns the registered user details without exposing the password', async () => {
+    UserModel.create.mockImplementation(async ({ username, email }) => ({
+      toJSON: () => ({
+        id: 'test-user-id',
+        username,
+        email,
+        createdAt: new Date(),
+      }),
+    }));
+
     const result = await registerUser({
       username: 'alice',
       email: 'alice@example.com',
@@ -17,6 +40,7 @@ describe('Auth service', () => {
       email: 'alice@example.com',
     });
     expect(result.user).not.toHaveProperty('password');
+    expect(result.user).not.toHaveProperty('passwordHash');
   });
 
   it('returns a login token and matching user email', async () => {
@@ -50,7 +74,9 @@ describe('Room service', () => {
   });
 
   it('joins a room for the provided user', async () => {
-    await expect(joinRoom({ roomId: 'room-1', userId: 'user-2' })).resolves.toEqual({
+    await expect(
+      joinRoom({ roomId: 'room-1', userId: 'user-2' })
+    ).resolves.toEqual({
       status: 'ok',
       roomId: 'room-1',
       members: ['user-2'],
@@ -78,7 +104,9 @@ describe('Messaging service', () => {
   });
 
   it('rejects empty or whitespace-only message text', async () => {
-    await expect(processMessage({ text: '   ' })).rejects.toMatchObject({
+    await expect(
+      processMessage({ text: '   ' })
+    ).rejects.toMatchObject({
       code: 'EMPTY_MESSAGE',
       status: 400,
       message: 'Message text cannot be empty',
