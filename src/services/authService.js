@@ -84,45 +84,94 @@ function verifyToken(token) {
  * Register a new user with salted password hashing.
  * Requirements: CHAT-SR-002 (#7), CHAT-F-001 (#11)
  */
-async function registerUser({ username, email, password }) {
-  if (!username || !email || !password) {
-    const error = new Error('Username, email, and password are required');
+async function registerUser({ username, email, password } = {}) {
+  if (
+    typeof username !== 'string' ||
+    typeof email !== 'string' ||
+    typeof password !== 'string' ||
+    !username.trim() ||
+    !email.trim() ||
+    !password
+  ) {
+    const error = new Error(
+      'Username, email, and password are required'
+    );
     error.status = 400;
+    error.code = 'VALIDATION_ERROR';
     throw error;
   }
 
-  // Check for uniqueness if DB is accessible
-  const existingEmail = await UserModel.findByEmail(email).catch(() => null);
+  const normalizedUsername = username.trim();
+  const normalizedEmail = email.trim().toLowerCase();
+
+  const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+  if (!emailPattern.test(normalizedEmail)) {
+    const error = new Error('A valid email address is required');
+    error.status = 400;
+    error.code = 'VALIDATION_ERROR';
+    throw error;
+  }
+
+  if (normalizedUsername.length > 50) {
+    const error = new Error('Username must not exceed 50 characters');
+    error.status = 400;
+    error.code = 'VALIDATION_ERROR';
+    throw error;
+  }
+
+  if (normalizedEmail.length > 255) {
+    const error = new Error('Email must not exceed 255 characters');
+    error.status = 400;
+    error.code = 'VALIDATION_ERROR';
+    throw error;
+  }
+
+  const existingEmail = await UserModel.findByEmail(normalizedEmail);
+
   if (existingEmail) {
     const error = new Error('Email already registered');
     error.status = 409;
+    error.code = 'DUPLICATE_EMAIL';
     throw error;
   }
 
-  const existingUsername = await UserModel.findByUsername(username).catch(() => null);
+  const existingUsername =
+    await UserModel.findByUsername(normalizedUsername);
+
   if (existingUsername) {
     const error = new Error('Username already taken');
     error.status = 409;
+    error.code = 'DUPLICATE_USERNAME';
     throw error;
   }
 
   const passwordHash = await hashPassword(password);
-  const user = await UserModel.create({ username, email, passwordHash }).catch(() => {
-    // Fallback for mocked/offline test environments
-    return new UserModel({
-      id: 'mock_uuid_' + Date.now(),
-      username,
-      email,
-      password_hash: passwordHash,
-      created_at: new Date(),
-    });
-  });
 
-  return {
-    status: 'ok',
-    message: 'User registered successfully',
-    user: user.toJSON(),
-  };
+  try {
+    const user = await UserModel.create({
+      username: normalizedUsername,
+      email: normalizedEmail,
+      passwordHash,
+    });
+
+    return {
+      status: 'ok',
+      message: 'User registered successfully',
+      user: user.toJSON(),
+    };
+  } catch (databaseError) {
+    if (databaseError.code === '23505') {
+      const error = new Error(
+        'Email or username is already registered'
+      );
+      error.status = 409;
+      error.code = 'DUPLICATE_ACCOUNT';
+      throw error;
+    }
+
+    throw databaseError;
+  }
 }
 
 /**
