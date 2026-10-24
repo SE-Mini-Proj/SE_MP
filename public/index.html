@@ -3,75 +3,57 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="description" content="HyperChat - Production Real-Time Chat Application featuring WebSocket gateway, RBAC moderation, TLS 1.2+ encryption, and structured audit logs." />
-  <meta name="theme-color" content="#080c14" />
-  <title>HyperChat • Real-Time Chat App</title>
+  <meta name="description" content="HyperChat - Scalable, enterprise-grade real-time chat application powered by Node.js, Express, Socket.IO, PostgreSQL, and Redis." />
+  <meta name="theme-color" content="#0b0f17" />
+  <title>HyperChat • Real-Time Chat</title>
+  
+  <!-- Modern Typography: Inter & JetBrains Mono -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+  
+  <!-- Application Stylesheet -->
   <link rel="stylesheet" href="/css/style.css" />
 </head>
 <body>
   <div id="app-container">
     <!-- ======================================================================
-         LEFT SIDEBAR: Brand, Persona Switcher, Channels & Contacts
+         LEFT SIDEBAR: Brand, Channels, Direct Messages, User Profile Dock
          ====================================================================== -->
-    <aside class="sidebar" id="leftSidebar" aria-label="Channels and Contacts">
-      <!-- Brand Header -->
+    <aside class="sidebar" id="leftSidebar" aria-label="Navigation Sidebar">
+      <!-- Brand & Workspace Header -->
       <div class="sidebar-header">
         <div class="brand">
           <div class="brand-icon">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path>
             </svg>
           </div>
-          <span class="brand-title">
-            HyperChat
-            <span class="brand-badge">Chat App</span>
-          </span>
-        </div>
-      </div>
-
-      <!-- Security Status Bar (CHAT-SR-001, CHAT-SR-004) -->
-      <div class="security-status-bar" id="securityStatusBar">
-        <span class="badge-pill badge-tls" title="CHAT-SR-001: Enforcing TLS 1.2+ (wss:// / https://) transport encryption">
-          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
-            <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
-          </svg>
-          TLS 1.2+
-        </span>
-        <span class="badge-pill badge-xss" title="CHAT-SR-004: Server-side XSS sanitization and output escaping active">
-          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
-          </svg>
-          XSS Safe
-        </span>
-      </div>
-
-      <!-- Quick Persona & Role Switcher (RBAC Review Tool) -->
-      <div class="persona-card" id="personaCard">
-        <div class="persona-header">
-          <div class="persona-meta">
-            <div class="avatar" id="personaAvatar">AL</div>
-            <div class="persona-info">
-              <span class="persona-name" id="personaName">Alice (Owner)</span>
-              <span class="persona-email" id="personaEmail">alice.owner@chat.local</span>
-            </div>
+          <div class="brand-text">
+            <span class="brand-title">HyperChat</span>
+            <span class="brand-subtitle">Real-Time Platform</span>
           </div>
-          <span class="role-tag owner" id="personaRoleTag">OWNER</span>
         </div>
-        <div>
-          <label for="personaSelect" style="font-size:0.68rem; color:var(--text-muted); display:block; margin-bottom:3px; font-weight:600; text-transform:uppercase;">
-            Switch Test Persona (RBAC):
-          </label>
-          <select id="personaSelect" class="persona-switch-select" title="Switch user persona to test RBAC permissions">
-            <!-- Options dynamically loaded by app.js -->
-          </select>
+
+        <div class="connection-status-pill" id="securityStatusBar" title="WebSocket Gateway Connection & TLS Status">
+          <span class="ping-indicator connected" id="pingIndicator"></span>
+          <span class="ping-label" id="pingLabel">Online</span>
         </div>
       </div>
 
-      <!-- Scrollable Navigation (Channels & Direct Messages) -->
+      <!-- Quick Search / Filter Bar -->
+      <div class="sidebar-search">
+        <div class="search-input-box">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="11" cy="11" r="8"></circle>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+          </svg>
+          <input type="text" placeholder="Quick search..." id="quickSearchInput" oninput="window.hyperChat.filterNavigation(this.value)" />
+          <kbd class="kbd-shortcut">⌘K</kbd>
+        </div>
+      </div>
+
+      <!-- Scrollable Navigation Area -->
       <div class="sidebar-content">
         <!-- Channels Section -->
         <div class="nav-section">
@@ -84,8 +66,8 @@
               </svg>
             </button>
           </div>
-          <div id="channelsList">
-            <!-- Dynamic channel items -->
+          <div id="channelsList" class="nav-list">
+            <!-- Dynamic channel items rendered by app.js -->
           </div>
         </div>
 
@@ -94,122 +76,158 @@
           <div class="section-title">
             <span>Direct Messages</span>
           </div>
-          <div id="contactsList">
-            <!-- Dynamic contact items -->
+          <div id="contactsList" class="nav-list">
+            <!-- Dynamic contact items rendered by app.js -->
           </div>
         </div>
       </div>
 
-      <!-- Sidebar Footer / Connection Status -->
-      <div class="sidebar-footer">
-        <div class="connection-pill">
-          <span class="ping-indicator" id="pingIndicator"></span>
-          <span id="pingLabel">Connecting...</span>
+      <!-- ======================================================================
+           USER PROFILE DOCK (Discord / Slack style bottom docked bar)
+           ====================================================================== -->
+      <div class="user-profile-dock" id="personaCard">
+        <div class="profile-details">
+          <div class="avatar-wrapper">
+            <div class="avatar" id="personaAvatar">AL</div>
+            <span class="status-indicator-badge online"></span>
+          </div>
+          <div class="user-meta">
+            <div class="user-name-row">
+              <span class="user-name" id="personaName">Alice</span>
+              <span class="role-badge owner" id="personaRoleTag">OWNER</span>
+            </div>
+            <span class="user-handle" id="personaEmail">alice@chat.internal</span>
+          </div>
         </div>
-        <div class="footer-actions">
-          <button class="icon-btn-subtle" id="refreshAuditBtn" title="Refresh Audit Logs" onclick="window.hyperChat.loadAuditLogs()">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <polyline points="23 4 23 10 17 10"></polyline>
-              <polyline points="1 20 1 14 7 14"></polyline>
-              <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
-            </svg>
-          </button>
-          <button class="icon-btn-subtle" id="toggleDrawerBtn" title="Open Room Details & Audit Logs" onclick="window.hyperChat.toggleDrawer()">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-              <line x1="9" y1="3" x2="9" y2="21"></line>
-            </svg>
-          </button>
+
+        <!-- Persona & Role Switcher -->
+        <div class="persona-switch-section">
+          <div class="persona-switch-wrapper" title="Switch active persona to test RBAC roles & permissions">
+            <select id="personaSelect" class="persona-select-custom" aria-label="Select test persona">
+              <!-- Populated dynamically by app.js -->
+            </select>
+            <div class="select-chevron">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="6 9 12 15 18 9"></polyline>
+              </svg>
+            </div>
+          </div>
         </div>
       </div>
     </aside>
 
     <!-- ======================================================================
-         MAIN CHAT PANE: Header, Message Feed, Typing Indicator, Composer
+         MAIN CHAT VIEWPORT: Header, Message Stream, Real-Time Composer
          ====================================================================== -->
     <main class="chat-main" id="chatMain">
-      <!-- Chat Header -->
+      <!-- Main Chat Header -->
       <header class="chat-header">
         <div class="chat-title-group">
-          <button class="btn-mobile-menu" id="mobileMenuBtn" aria-label="Open navigation menu" onclick="window.hyperChat.toggleSidebar()">
+          <button class="btn-mobile-menu" id="mobileMenuBtn" aria-label="Toggle navigation menu" onclick="window.hyperChat.toggleSidebar()">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <line x1="3" y1="12" x2="21" y2="12"></line>
               <line x1="3" y1="6" x2="21" y2="6"></line>
               <line x1="3" y1="18" x2="21" y2="18"></line>
             </svg>
           </button>
-          <div class="chat-title-text">
+          
+          <div class="room-title-info">
             <h1 class="chat-room-name" id="chatRoomName"># general</h1>
-            <span class="chat-room-topic" id="chatRoomTopic">Global team discussion and updates</span>
+            <span class="chat-room-topic" id="chatRoomTopic">Global team discussion, architecture, and live updates</span>
           </div>
         </div>
 
+        <!-- Top Right Actions Bar -->
         <div class="chat-header-actions">
-          <button class="header-btn highlight" id="headerAuditBtn" title="View Moderation Audit Logs" onclick="window.hyperChat.setDrawerTab('audit'); window.hyperChat.toggleDrawer();">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <!-- Security & Diagnostics Button -->
+          <button class="header-action-btn" id="headerSecurityBtn" title="View Security & Transport Diagnostics" onclick="window.hyperChat.setDrawerTab('security'); window.hyperChat.openDrawerIfNotOpen();">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+            </svg>
+            <span class="btn-text">Security</span>
+          </button>
+
+          <!-- Moderation Audit Logs Button -->
+          <button class="header-action-btn" id="headerAuditBtn" title="View Moderation Audit Logs (PostgreSQL)" onclick="window.hyperChat.setDrawerTab('audit'); window.hyperChat.openDrawerIfNotOpen();">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
               <polyline points="14 2 14 8 20 8"></polyline>
               <line x1="16" y1="13" x2="8" y2="13"></line>
               <line x1="16" y1="17" x2="8" y2="17"></line>
               <polyline points="10 9 9 9 8 9"></polyline>
             </svg>
-            Audit Logs
+            <span class="btn-text">Audit Log</span>
           </button>
-          <button class="header-btn" id="headerMembersBtn" title="View Members & Moderation" onclick="window.hyperChat.setDrawerTab('members'); window.hyperChat.toggleDrawer();">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+
+          <!-- Members & RBAC Button -->
+          <button class="header-action-btn highlight" id="headerMembersBtn" title="Channel Members & Moderation" onclick="window.hyperChat.setDrawerTab('members'); window.hyperChat.toggleDrawer();">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
               <circle cx="9" cy="7" r="4"></circle>
               <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
               <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
             </svg>
-            Members
+            <span class="btn-text">Members</span>
           </button>
         </div>
       </header>
 
-      <!-- Message History Stream / Feed -->
-      <section class="messages-container" id="messagesContainer" aria-label="Message Feed" role="log">
-        <!-- Messages rendered dynamically -->
+      <!-- Message History Stream -->
+      <section class="messages-container" id="messagesContainer" aria-label="Message Stream" role="log">
+        <!-- Messages rendered dynamically by app.js -->
       </section>
 
-      <!-- Real-Time Typing Notice Banner (CHAT-F-031) -->
+      <!-- Real-Time Typing Notice Banner -->
       <div class="typing-banner" id="typingBanner" aria-live="polite">
-        <!-- Animated typing indicator -->
+        <!-- Live typing indicator with bounce dots -->
       </div>
 
-      <!-- Chat Composer (Input, XSS tester, Send) -->
-      <div class="composer-wrapper">
-        <div class="composer-container">
-          <div class="composer-input-row">
+      <!-- Modern Chat Composer -->
+      <div class="composer-outer">
+        <div class="composer-card">
+          <div class="composer-textarea-row">
             <textarea
               id="composerInput"
-              class="composer-input"
+              class="composer-textarea"
               rows="1"
-              placeholder="Message #general... (Enter to send, Shift+Enter for new line)"
+              placeholder="Message #general... (Enter to send, Shift+Enter for newline)"
               autocomplete="off"
-              aria-label="Type message"
+              aria-label="Message input field"
             ></textarea>
           </div>
-          <div class="composer-toolbar">
-            <div class="toolbar-left">
-              <button class="tool-btn xss-btn" id="xssTestBtn" title="Insert harmless script tag to demonstrate XSS sanitization (CHAT-SR-004)">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
-                </svg>
-                Test XSS Payload
-              </button>
-              <button class="tool-btn" title="Add code formatting" onclick="document.getElementById('composerInput').value += '```\n// code snippet\n```'; document.getElementById('composerInput').focus();">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+
+          <div class="composer-actions-bar">
+            <div class="composer-tools-left">
+              <!-- Code Snippet Insertion -->
+              <button class="tool-icon-btn" title="Insert code block" onclick="window.hyperChat.insertCodeSnippet()">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                   <polyline points="16 18 22 12 16 6"></polyline>
                   <polyline points="8 6 2 12 8 18"></polyline>
                 </svg>
-                Code
+                <span>Code</span>
+              </button>
+
+              <!-- Emoji Insertion Shortcut -->
+              <button class="tool-icon-btn" title="Add emoji" onclick="window.hyperChat.insertEmoji('🚀')">
+                <span>✨ Emoji</span>
+              </button>
+
+              <!-- Security XSS Test Payload Button (Discreet, Professional) -->
+              <button class="tool-icon-btn security-test-btn" id="xssTestBtn" title="Test server-side XSS sanitization (OWASP compliance demo)">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+                </svg>
+                <span>Test Sanitization</span>
               </button>
             </div>
-            <div class="toolbar-right">
-              <button class="send-btn" id="sendBtn" title="Send message">
+
+            <div class="composer-tools-right">
+              <button class="send-action-btn" id="sendBtn" title="Send message (Enter)">
                 <span>Send</span>
-                <span class="send-kbd-hint">⏎</span>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round">
+                  <line x1="22" y1="2" x2="11" y2="13"></line>
+                  <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                </svg>
               </button>
             </div>
           </div>
@@ -218,55 +236,55 @@
     </main>
 
     <!-- ======================================================================
-         RIGHT SLIDE-OVER DRAWER: Members, Moderation Actions, Audit Logs
+         RIGHT SLIDE-OVER DRAWER: Members & Moderation, Audit Log, Diagnostics
          ====================================================================== -->
-    <aside class="drawer collapsed" id="sideDrawer" aria-label="Room Details and Moderation">
+    <aside class="drawer collapsed" id="sideDrawer" aria-label="Room Settings and Administration">
       <!-- Drawer Header -->
       <div class="drawer-header">
-        <h2 class="drawer-title">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <div class="drawer-title-group">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
             <circle cx="12" cy="12" r="3"></circle>
             <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
           </svg>
-          Room Settings & RBAC
-        </h2>
-        <button class="icon-btn-subtle" title="Close drawer" onclick="window.hyperChat.toggleDrawer()">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <h2 class="drawer-title">Workspace Console</h2>
+        </div>
+        <button class="drawer-close-btn" title="Close drawer" onclick="window.hyperChat.toggleDrawer()">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
             <line x1="18" y1="6" x2="6" y2="18"></line>
             <line x1="6" y1="6" x2="18" y2="18"></line>
           </svg>
         </button>
       </div>
 
-      <!-- Navigation Tabs -->
+      <!-- Segmented Tab Navigation -->
       <div class="drawer-tabs">
         <button class="drawer-tab active" data-tab="members" onclick="window.hyperChat.setDrawerTab('members')">
-          Members & RBAC
+          Members
         </button>
         <button class="drawer-tab" data-tab="audit" onclick="window.hyperChat.setDrawerTab('audit')">
           Audit Logs
         </button>
         <button class="drawer-tab" data-tab="security" onclick="window.hyperChat.setDrawerTab('security')">
-          Security
+          Security & Stack
         </button>
       </div>
 
-      <!-- Tab Content Area -->
+      <!-- Drawer Content Panels -->
       <div class="drawer-content">
         <!-- 1. Members & Moderation Tab -->
-        <div id="drawerMembersPane">
-          <div style="font-size:0.75rem; color:var(--text-muted); margin-bottom:0.75rem;">
-            Owners and moderators can mute, ban, or kick members. Actions create immutable audit logs.
+        <div id="drawerMembersPane" class="drawer-pane">
+          <div class="pane-description">
+            Channel members, active presence, and RBAC moderation controls (Mute, Ban, Kick).
           </div>
-          <div id="drawerMembersList" style="display:flex; flex-direction:column; gap:8px;">
-            <!-- Rendered by app.js -->
+          <div id="drawerMembersList" class="members-stack">
+            <!-- Dynamic member cards rendered by app.js -->
           </div>
         </div>
 
-        <!-- 2. Audit Logs Tab (CHAT-SR-005, TC-Sec-05) -->
-        <div id="drawerAuditPane" style="display:none;">
-          <div class="audit-controls" style="margin-bottom:0.75rem;">
-            <select class="audit-filter-select" id="auditActionFilter" onchange="window.hyperChat.loadAuditLogs()">
+        <!-- 2. Audit Logs Tab (PostgreSQL Persistence) -->
+        <div id="drawerAuditPane" class="drawer-pane" style="display:none;">
+          <div class="audit-toolbar">
+            <select class="audit-select" id="auditActionFilter" onchange="window.hyperChat.loadAuditLogs()">
               <option value="ALL">All Actions</option>
               <option value="MUTE_USER">MUTE_USER</option>
               <option value="UNMUTE_USER">UNMUTE_USER</option>
@@ -275,42 +293,59 @@
               <option value="DELETE_MESSAGE">DELETE_MESSAGE</option>
               <option value="REMOVE_MEMBER">REMOVE_MEMBER</option>
             </select>
-            <button class="btn-secondary" style="font-size:0.72rem; padding:0.35rem 0.65rem;" onclick="window.hyperChat.loadAuditLogs()">
+            <button class="audit-refresh-btn" id="refreshAuditBtn" title="Refresh audit log trail" onclick="window.hyperChat.loadAuditLogs()">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="23 4 23 10 17 10"></polyline>
+                <polyline points="1 20 1 14 7 14"></polyline>
+                <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+              </svg>
               Refresh
             </button>
           </div>
-          <div id="drawerAuditLogsList" style="display:flex; flex-direction:column; gap:8px;">
-            <!-- Rendered by app.js -->
+          <div id="drawerAuditLogsList" class="audit-stack">
+            <!-- Dynamic audit trail items rendered by app.js -->
           </div>
         </div>
 
         <!-- 3. Security & Architecture Diagnostics Tab -->
-        <div id="drawerSecurityPane" style="display:none;">
-          <div class="audit-log-card">
-            <h4 style="color:#fff; font-size:0.85rem; margin-bottom:4px;">Transport Security (CHAT-SR-001)</h4>
-            <p style="font-size:0.75rem; color:var(--text-muted); line-height:1.4;">
-              TLS 1.2+ encryption is mandatory. Plaintext <code>ws://</code> and <code>http://</code> connections are rejected via strict middleware validation.
+        <div id="drawerSecurityPane" class="drawer-pane" style="display:none;">
+          <div class="security-card">
+            <div class="security-card-header">
+              <span class="security-status-icon success">✓</span>
+              <h4>Transport Security (TLS 1.2+)</h4>
+            </div>
+            <p>
+              Strict transport encryption enforcement. Plaintext <code>ws://</code> and <code>http://</code> requests are blocked in production gateway environments.
             </p>
           </div>
 
-          <div class="audit-log-card">
-            <h4 style="color:#fff; font-size:0.85rem; margin-bottom:4px;">Cross-Site Scripting (CHAT-SR-004)</h4>
-            <p style="font-size:0.75rem; color:var(--text-muted); line-height:1.4;">
-              All incoming messages are sanitized via <code>sanitizeMessage()</code>. HTML tags and malicious event payloads are neutralized safely before broadcast.
+          <div class="security-card">
+            <div class="security-card-header">
+              <span class="security-status-icon success">✓</span>
+              <h4>OWASP XSS Defense</h4>
+            </div>
+            <p>
+              All message payloads undergo server-side HTML entity escaping via <code>sanitizeMessage()</code>. Embedded scripts and dangerous DOM attributes are safely disarmed.
             </p>
           </div>
 
-          <div class="audit-log-card">
-            <h4 style="color:#fff; font-size:0.85rem; margin-bottom:4px;">Role-Based Access Control (CHAT-SR-005)</h4>
-            <p style="font-size:0.75rem; color:var(--text-muted); line-height:1.4;">
-              Moderation actions are enforced by <code>requireRoomRole([OWNER, ADMIN, MODERATOR])</code>. Unprivileged requests return HTTP 403 Forbidden.
+          <div class="security-card">
+            <div class="security-card-header">
+              <span class="security-status-icon success">✓</span>
+              <h4>Role-Based Access Control (RBAC)</h4>
+            </div>
+            <p>
+              Hierarchical permission matrix (<code>Owner &gt; Admin &gt; Moderator &gt; Member</code>). Unprivileged requests are stopped at route middlewares returning HTTP 403 Forbidden.
             </p>
           </div>
 
-          <div class="audit-log-card">
-            <h4 style="color:#fff; font-size:0.85rem; margin-bottom:4px;">Redis Scalability & Presence</h4>
-            <p style="font-size:0.75rem; color:var(--text-muted); line-height:1.4;">
-              Redis Pub/Sub multiplexes cross-instance messaging and heartbeat presence tracking across concurrent cluster nodes.
+          <div class="security-card">
+            <div class="security-card-header">
+              <span class="security-status-icon success">✓</span>
+              <h4>Redis Cluster Pub/Sub</h4>
+            </div>
+            <p>
+              In-memory message bus multiplexing real-time channel fanout across distributed horizontal worker nodes and tracking user presence heartbeats.
             </p>
           </div>
         </div>
@@ -322,20 +357,20 @@
        MODAL DIALOGS
        ====================================================================== -->
 
-  <!-- 1. Mute User Modal (CHAT-SR-005) -->
-  <div class="modal-backdrop" id="muteModal">
+  <!-- 1. Mute Member Modal -->
+  <div class="modal-backdrop" id="muteModal" role="dialog" aria-modal="true" aria-labelledby="muteModalTitle">
     <div class="modal-dialog">
       <div class="modal-header">
-        <h3 class="modal-title">Mute Member</h3>
-        <button class="icon-btn-subtle" onclick="window.hyperChat.closeMuteModal()">✕</button>
+        <h3 class="modal-title" id="muteModalTitle">Mute Channel Member</h3>
+        <button class="modal-close-btn" onclick="window.hyperChat.closeMuteModal()" aria-label="Close modal">✕</button>
       </div>
       <div class="modal-body">
-        <p style="font-size:0.82rem; color:var(--text-secondary);">
-          Mute <strong id="muteTargetName" style="color:#fff;">User</strong> from posting messages in this room.
+        <p class="modal-instruction">
+          Restrict <strong id="muteTargetName" class="highlight-target">User</strong> from sending messages in this channel.
         </p>
         <div class="form-group">
           <label class="form-label" for="muteDurationSelect">Duration</label>
-          <select id="muteDurationSelect" class="form-input">
+          <select id="muteDurationSelect" class="form-control">
             <option value="5m">5 Minutes</option>
             <option value="15m">15 Minutes</option>
             <option value="1h">1 Hour</option>
@@ -343,70 +378,81 @@
           </select>
         </div>
         <div class="form-group">
-          <label class="form-label" for="muteReasonInput">Reason (Recorded in Audit Trail)</label>
-          <input type="text" id="muteReasonInput" class="form-input" placeholder="e.g. Disruptive behavior or excessive spam" value="Disruptive behavior" />
+          <label class="form-label" for="muteReasonInput">Reason (Logged in Immutable Audit Trail)</label>
+          <input type="text" id="muteReasonInput" class="form-control" placeholder="e.g. Inappropriate messages or excessive spam" value="Disruptive behavior" />
         </div>
       </div>
       <div class="modal-footer">
-        <button class="btn-secondary" onclick="window.hyperChat.closeMuteModal()">Cancel</button>
-        <button class="btn-primary" onclick="window.hyperChat.confirmMuteUser()">Confirm Mute</button>
+        <button class="btn-subtle" onclick="window.hyperChat.closeMuteModal()">Cancel</button>
+        <button class="btn-warning-action" onclick="window.hyperChat.confirmMuteUser()">Confirm Mute</button>
       </div>
     </div>
   </div>
 
-  <!-- 2. Ban User Modal (CHAT-SR-005) -->
-  <div class="modal-backdrop" id="banModal">
+  <!-- 2. Ban Member Modal -->
+  <div class="modal-backdrop" id="banModal" role="dialog" aria-modal="true" aria-labelledby="banModalTitle">
     <div class="modal-dialog">
       <div class="modal-header">
-        <h3 class="modal-title">Ban Member</h3>
-        <button class="icon-btn-subtle" onclick="window.hyperChat.closeBanModal()">✕</button>
+        <h3 class="modal-title" id="banModalTitle">Ban Member from Room</h3>
+        <button class="modal-close-btn" onclick="window.hyperChat.closeBanModal()" aria-label="Close modal">✕</button>
       </div>
       <div class="modal-body">
-        <p style="font-size:0.82rem; color:var(--text-secondary);">
-          Are you sure you want to ban <strong id="banTargetName" style="color:#fff;">User</strong>? They will be evicted and prevented from rejoining.
-        </p>
-        <div class="form-group">
-          <label class="form-label" for="banReasonInput">Reason (Recorded in Audit Trail)</label>
-          <input type="text" id="banReasonInput" class="form-input" placeholder="e.g. Severe TOS violation" value="Severe TOS violation" />
+        <div class="danger-callout">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+            <line x1="12" y1="9" x2="12" y2="13"></line>
+            <line x1="12" y1="17" x2="12.01" y2="17"></line>
+          </svg>
+          <span>
+            Are you sure you want to ban <strong id="banTargetName">User</strong>? They will be permanently evicted from this channel.
+          </span>
+        </div>
+        <div class="form-group" style="margin-top:1rem;">
+          <label class="form-label" for="banReasonInput">Reason (Audit Log Record)</label>
+          <input type="text" id="banReasonInput" class="form-control" placeholder="e.g. Severe violation of community standards" value="Severe violation of guidelines" />
         </div>
       </div>
       <div class="modal-footer">
-        <button class="btn-secondary" onclick="window.hyperChat.closeBanModal()">Cancel</button>
-        <button class="btn-danger" onclick="window.hyperChat.confirmBanUser()">Confirm Ban</button>
+        <button class="btn-subtle" onclick="window.hyperChat.closeBanModal()">Cancel</button>
+        <button class="btn-danger-action" onclick="window.hyperChat.confirmBanUser()">Confirm Ban</button>
       </div>
     </div>
   </div>
 
-  <!-- 3. Create Channel Modal (CHAT-F-020) -->
-  <div class="modal-backdrop" id="createRoomModal">
+  <!-- 3. Create Channel Modal -->
+  <div class="modal-backdrop" id="createRoomModal" role="dialog" aria-modal="true" aria-labelledby="createRoomModalTitle">
     <div class="modal-dialog">
       <div class="modal-header">
-        <h3 class="modal-title">Create New Channel</h3>
-        <button class="icon-btn-subtle" onclick="window.hyperChat.closeCreateRoomModal()">✕</button>
+        <h3 class="modal-title" id="createRoomModalTitle">Create New Channel</h3>
+        <button class="modal-close-btn" onclick="window.hyperChat.closeCreateRoomModal()" aria-label="Close modal">✕</button>
       </div>
       <div class="modal-body">
         <div class="form-group">
           <label class="form-label" for="newRoomName">Channel Name</label>
-          <input type="text" id="newRoomName" class="form-input" placeholder="e.g. design-reviews" />
+          <div class="input-prefix-wrapper">
+            <span class="prefix">#</span>
+            <input type="text" id="newRoomName" class="form-control with-prefix" placeholder="design-systems" />
+          </div>
         </div>
-        <div class="form-group" style="flex-direction:row; align-items:center; gap:8px;">
-          <input type="checkbox" id="newRoomPrivate" style="cursor:pointer;" />
-          <label for="newRoomPrivate" style="font-size:0.82rem; color:var(--text-secondary); cursor:pointer;">
-            Make private (requires invite)
+        <div class="checkbox-row">
+          <input type="checkbox" id="newRoomPrivate" />
+          <label for="newRoomPrivate">
+            <strong>Make private channel</strong>
+            <span>Only invited members can view and send messages</span>
           </label>
         </div>
       </div>
       <div class="modal-footer">
-        <button class="btn-secondary" onclick="window.hyperChat.closeCreateRoomModal()">Cancel</button>
-        <button class="btn-primary" onclick="window.hyperChat.confirmCreateRoom()">Create Channel</button>
+        <button class="btn-subtle" onclick="window.hyperChat.closeCreateRoomModal()">Cancel</button>
+        <button class="btn-primary-action" onclick="window.hyperChat.confirmCreateRoom()">Create Channel</button>
       </div>
     </div>
   </div>
 
-  <!-- Toast Container -->
+  <!-- Global Toast Notification Stack -->
   <div id="toast-container" aria-live="polite"></div>
 
-  <!-- Socket.io client script: loaded from local server with CDN fallback -->
+  <!-- Socket.IO client library (Local server with CDN fallback) -->
   <script src="/socket.io/socket.io.js"></script>
   <script>
     if (typeof io === 'undefined') {
@@ -415,7 +461,8 @@
       document.head.appendChild(script);
     }
   </script>
-  <!-- Application Script -->
+  
+  <!-- Main Client Application Controller -->
   <script src="/js/app.js"></script>
 </body>
 </html>

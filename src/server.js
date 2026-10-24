@@ -21,49 +21,39 @@ app.set('io', io);
 if (process.env.NODE_ENV !== 'test') {
   async function startServer() {
     try {
-      // Connect all Redis clients before accepting application traffic.
-      await connectRedis();
+      if (config.redis && config.redis.enabled !== false) {
+        // Connect all Redis clients before accepting application traffic.
+        await connectRedis();
 
-      // Subscribe to Redis events for cross-instance communication.
-      await initializePubSub(handleRedisEvent);
+        // Subscribe to Redis events for cross-instance communication.
+        await initializePubSub(handleRedisEvent);
 
-      server.listen(config.port, () => {
-        console.log(
-          `[Server] Real-Time Chat Server running on http://localhost:${config.port}`
-        );
-        console.log(`[Server] Environment: ${config.nodeEnv}`);
-        console.log(
-          `[Server] WebSocket Gateway initialized on port ${config.port}`
-        );
         console.log('[Server] Redis clients connected successfully');
         console.log('[Server] Redis Pub/Sub initialized successfully');
-      });
+      } else {
+        console.log('[Server] Redis disabled; running in standalone mode');
+      }
     } catch (error) {
-      console.error(
-        '[Server] Failed to initialize Redis:',
-        error.message
+      console.warn(
+        `[Server Warning] Redis initialization failed: ${error.message}. Running in standalone mode.`
       );
-
       try {
         await closePubSub();
-      } catch (cleanupError) {
-        console.error(
-          '[Server] Failed to close Redis Pub/Sub:',
-          cleanupError.message
-        );
-      }
-
-      try {
         await closeRedis();
-      } catch (cleanupError) {
-        console.error(
-          '[Server] Failed to close Redis clients:',
-          cleanupError.message
-        );
+      } catch {
+        // Ignore cleanup error on failed init
       }
-
-      process.exitCode = 1;
     }
+
+    server.listen(config.port, () => {
+      console.log(
+        `[Server] Real-Time Chat Server running on http://localhost:${config.port}`
+      );
+      console.log(`[Server] Environment: ${config.nodeEnv}`);
+      console.log(
+        `[Server] WebSocket Gateway initialized on port ${config.port}`
+      );
+    });
   }
 
   startServer();

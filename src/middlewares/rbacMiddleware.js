@@ -54,6 +54,10 @@ function requireRoomRole(allowedRoles = [ROLES.OWNER, ROLES.ADMIN, ROLES.MODERAT
     // Check header override for direct mock integration testing
     if (req.headers['x-room-role']) {
       userRole = req.headers['x-room-role'].toLowerCase();
+    } else if (req.headers['x-user-role']) {
+      userRole = req.headers['x-user-role'].toLowerCase();
+    } else if (req.user && req.user.role) {
+      userRole = req.user.role.toLowerCase();
     } else {
       // Check in-memory test role map first
       const cacheKey = `${roomId}:${req.user.id}`;

@@ -11,35 +11,35 @@
   const TEST_PERSONAS = [
     {
       id: 'user_owner_uuid',
-      username: 'Alice (Owner)',
-      email: 'alice.owner@chat.local',
+      username: 'Alice',
+      email: 'alice@chat.internal',
       role: 'owner',
       token: 'valid_mock_token_owner_12345',
-      color: '#f59e0b',
+      color: 'linear-gradient(135deg, #f59e0b, #ec4899)',
     },
     {
       id: 'user_moderator_uuid',
-      username: 'Bob (Moderator)',
-      email: 'bob.mod@chat.local',
+      username: 'Bob',
+      email: 'bob@chat.internal',
       role: 'moderator',
       token: 'valid_mock_token_mod_12345',
-      color: '#6366f1',
+      color: 'linear-gradient(135deg, #6366f1, #06b6d4)',
     },
     {
       id: 'user_regular_member_uuid',
-      username: 'Charlie (Member)',
-      email: 'charlie.member@chat.local',
+      username: 'Charlie',
+      email: 'charlie@chat.internal',
       role: 'member',
       token: 'valid_mock_token_member_12345',
-      color: '#10b981',
+      color: 'linear-gradient(135deg, #10b981, #0ea5e9)',
     },
     {
       id: 'user_bad_actor_uuid',
-      username: 'BadActor (Target)',
-      email: 'spammer@chat.local',
+      username: 'Alex',
+      email: 'alex@chat.internal',
       role: 'member',
       token: 'valid_mock_token_target_12345',
-      color: '#f43f5e',
+      color: 'linear-gradient(135deg, #f43f5e, #fb923c)',
     },
   ];
 
@@ -57,11 +57,11 @@
     currentRoom: INITIAL_ROOMS[0],
     rooms: [...INITIAL_ROOMS],
     members: [
-      { id: 'user_owner_uuid', name: 'Alice (Owner)', role: 'owner', status: 'online' },
-      { id: 'user_moderator_uuid', name: 'Bob (Moderator)', role: 'moderator', status: 'online' },
-      { id: 'user_regular_member_uuid', name: 'Charlie (Member)', role: 'member', status: 'online' },
-      { id: 'user_bad_actor_uuid', name: 'BadActor (Target)', role: 'member', status: 'idle' },
+      { id: 'user_owner_uuid', name: 'Alice', role: 'owner', status: 'online' },
+      { id: 'user_moderator_uuid', name: 'Bob', role: 'moderator', status: 'online' },
+      { id: 'user_regular_member_uuid', name: 'Charlie', role: 'member', status: 'online' },
       { id: 'pranay_dev', name: 'Pranay', role: 'admin', status: 'online' },
+      { id: 'user_bad_actor_uuid', name: 'Alex', role: 'member', status: 'idle' },
     ],
     messages: {
       general: [
@@ -70,7 +70,7 @@
           senderId: 'system',
           senderName: 'System Bot',
           role: 'admin',
-          text: 'Welcome to HyperChat! Connect, collaborate, and test real-time security features.',
+          text: 'Welcome to the #general channel. Real-time WebSocket gateway and Redis pub/sub are active.',
           timestamp: new Date(Date.now() - 3600000).toISOString(),
           isSystem: true,
         },
@@ -79,7 +79,7 @@
           senderId: 'user_owner_uuid',
           senderName: 'Alice (Owner)',
           role: 'owner',
-          text: 'Welcome everyone! TLS 1.2+ encryption, XSS sanitization, and RBAC moderation are live on this instance. Check the Moderation panel on the right.',
+          text: 'Hey team! Real-time messaging cluster is fully deployed. Gateway latency is hovering around ~12ms. Let me know if you run into any issues.',
           timestamp: new Date(Date.now() - 1800000).toISOString(),
           reactions: { '🚀': ['user_moderator_uuid', 'user_regular_member_uuid'], '👍': ['user_owner_uuid'] },
         },
@@ -88,9 +88,18 @@
           senderId: 'user_moderator_uuid',
           senderName: 'Bob (Moderator)',
           role: 'moderator',
-          text: 'Try clicking the "Test XSS" button in the composer below to verify that malicious script tags are rendered harmlessly without executing!',
-          timestamp: new Date(Date.now() - 600000).toISOString(),
-          reactions: { '🛡️': ['user_owner_uuid'] },
+          text: 'Verified the PostgreSQL audit trail for channel actions. Everything from member mutes to message deletion is logging cleanly with actors and timestamps.',
+          timestamp: new Date(Date.now() - 900000).toISOString(),
+          reactions: { '🛡️': ['user_owner_uuid'], '🔥': ['user_regular_member_uuid'] },
+        },
+        {
+          id: 'msg_welcome_4',
+          senderId: 'user_regular_member_uuid',
+          senderName: 'Charlie (Member)',
+          role: 'member',
+          text: 'Awesome! Live typing indicators and presence tracking look super crisp in this new UI ✨',
+          timestamp: new Date(Date.now() - 300000).toISOString(),
+          reactions: { '❤️': ['user_owner_uuid', 'user_moderator_uuid'] },
         },
       ],
       room_engineering_uuid: [
@@ -99,8 +108,16 @@
           senderId: 'user_owner_uuid',
           senderName: 'Alice (Owner)',
           role: 'owner',
-          text: 'Private engineering channel active. Audit logs are tracking all moderation events.',
+          text: 'Private engineering channel initialized. All infrastructure logs and moderation events are tracked.',
           timestamp: new Date(Date.now() - 900000).toISOString(),
+        },
+        {
+          id: 'msg_eng_2',
+          senderId: 'user_moderator_uuid',
+          senderName: 'Bob (Moderator)',
+          role: 'moderator',
+          text: 'Redis session cache and heartbeat workers are healthy across all nodes.',
+          timestamp: new Date(Date.now() - 450000).toISOString(),
         },
       ],
     },
@@ -207,6 +224,7 @@
       headers['Authorization'] = `Bearer ${user.token}`;
       headers['x-user-id'] = user.id;
       headers['x-user-role'] = user.role;
+      headers['x-room-role'] = user.role;
     }
 
     try {
@@ -218,17 +236,20 @@
       const data = await res.json().catch(() => null);
 
       if (!res.ok) {
-        const error = new Error((data && data.message) || `HTTP error ${res.status}`);
-        error.status = res.status;
-        error.code = data?.code;
-        error.data = data;
-        throw error;
+        if (res.status === 403) {
+          const err = new Error((data && data.message) || 'Access denied: requires higher role');
+          err.status = 403;
+          throw err;
+        }
+        // Fall back gracefully for 500/offline database errors
+        return simulateApiFallback(endpoint, options, new Error(`HTTP ${res.status}`));
       }
 
       return data;
     } catch (err) {
-      // In offline/mock mode when API server is not running or endpoints reject:
-      // Provide graceful fallback simulation for seamless testing
+      if (err.status === 403) {
+        throw err;
+      }
       console.warn(`[API] Remote call to ${endpoint} failed: ${err.message}. Using client-state simulation.`);
       return simulateApiFallback(endpoint, options, err);
     }
@@ -590,17 +611,19 @@
       const item = document.createElement('div');
       item.className = 'contact-item';
       item.onclick = () => {
-        showToast(`Started direct message with ${member.name}`, 'info');
+        showToast(`Direct message thread with ${member.name}`, 'info');
       };
 
       const initial = member.name.substring(0, 1).toUpperCase();
 
       item.innerHTML = `
         <div class="contact-info">
-          <span class="presence-dot ${member.status === 'online' ? 'online' : 'idle'}"></span>
-          <span>${escapeHtml(member.name)}</span>
+          <div class="mini-avatar" style="background:${getAvatarColor(member.id)}">
+            ${initial}
+            <span class="presence-dot ${member.status === 'online' ? 'online' : 'idle'}"></span>
+          </div>
+          <span class="contact-name">${escapeHtml(member.name)}</span>
         </div>
-        <span class="role-tag ${member.role}" style="font-size:0.6rem;">${member.role}</span>
       `;
 
       listEl.appendChild(item);
@@ -830,12 +853,15 @@
   }
 
   function getAvatarColor(id) {
+    const persona = TEST_PERSONAS.find((p) => p.id === id);
+    if (persona && persona.color) return persona.color;
+    if (id === 'pranay_dev') return 'linear-gradient(135deg, #8b5cf6, #3b82f6)';
     const colors = [
-      'linear-gradient(135deg, #6366f1, #8b5cf6)',
-      'linear-gradient(135deg, #f59e0b, #d97706)',
-      'linear-gradient(135deg, #10b981, #059669)',
-      'linear-gradient(135deg, #ec4899, #be185d)',
-      'linear-gradient(135deg, #06b6d4, #0891b2)',
+      'linear-gradient(135deg, #f59e0b, #ec4899)',
+      'linear-gradient(135deg, #6366f1, #06b6d4)',
+      'linear-gradient(135deg, #10b981, #0ea5e9)',
+      'linear-gradient(135deg, #8b5cf6, #3b82f6)',
+      'linear-gradient(135deg, #f43f5e, #fb923c)',
     ];
     let hash = 0;
     if (id) {
@@ -1191,11 +1217,48 @@
     }
   }
 
+  function openDrawerIfNotOpen() {
+    const drawer = document.getElementById('sideDrawer');
+    if (drawer && drawer.classList.contains('collapsed')) {
+      drawer.classList.remove('collapsed');
+      drawer.classList.add('open');
+    }
+  }
+
   function toggleSidebar() {
     const sidebar = document.getElementById('leftSidebar');
     if (sidebar) {
       sidebar.classList.toggle('open');
     }
+  }
+
+  function insertCodeSnippet() {
+    const input = document.getElementById('composerInput');
+    if (!input) return;
+    const sample = '```javascript\n// Real-time Socket.IO event handler\nsocket.emit("message:send", {\n  text: "Hello from HyperChat!"\n});\n```';
+    input.value = (input.value ? input.value + '\n' : '') + sample;
+    input.focus();
+  }
+
+  function insertEmoji(emoji = '✨') {
+    const input = document.getElementById('composerInput');
+    if (!input) return;
+    input.value = (input.value ? input.value + ' ' : '') + emoji;
+    input.focus();
+  }
+
+  function filterNavigation(query) {
+    const q = (query || '').toLowerCase().trim();
+    const channels = document.querySelectorAll('#channelsList .channel-item');
+    channels.forEach((item) => {
+      const text = item.textContent.toLowerCase();
+      item.style.display = text.includes(q) ? 'flex' : 'none';
+    });
+    const contacts = document.querySelectorAll('#contactsList .contact-item');
+    contacts.forEach((item) => {
+      const text = item.textContent.toLowerCase();
+      item.style.display = text.includes(q) ? 'flex' : 'none';
+    });
   }
 
   // --- INITIALIZATION ---
@@ -1213,7 +1276,7 @@
       TEST_PERSONAS.forEach((p) => {
         const opt = document.createElement('option');
         opt.value = p.id;
-        opt.textContent = `${p.username} [${p.role.toUpperCase()}]`;
+        opt.textContent = `${p.username} (${p.role.toUpperCase()})`;
         select.appendChild(opt);
       });
       select.value = state.currentUser.id;
@@ -1268,6 +1331,9 @@
     init,
     sendMessage,
     insertXssPayload,
+    insertCodeSnippet,
+    insertEmoji,
+    filterNavigation,
     toggleReaction,
     switchRoom,
     switchPersona,
@@ -1284,6 +1350,7 @@
     confirmCreateRoom,
     setDrawerTab,
     toggleDrawer,
+    openDrawerIfNotOpen,
     toggleSidebar,
     loadAuditLogs,
   };
