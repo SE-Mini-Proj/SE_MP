@@ -70,7 +70,7 @@
           senderId: 'system',
           senderName: 'System Bot',
           role: 'admin',
-          text: 'Welcome to HyperChat! Connect, collaborate, and test real-time security features.',
+          text: 'Welcome to the #general channel. Real-time WebSocket gateway and Redis pub/sub are active.',
           timestamp: new Date(Date.now() - 3600000).toISOString(),
           isSystem: true,
         },
@@ -79,7 +79,7 @@
           senderId: 'user_owner_uuid',
           senderName: 'Alice (Owner)',
           role: 'owner',
-          text: 'Welcome everyone! TLS 1.2+ encryption, XSS sanitization, and RBAC moderation are live on this instance. Check the Moderation panel on the right.',
+          text: 'Hey team! Real-time messaging cluster is fully deployed. Gateway latency is hovering around ~12ms. Let me know if you run into any issues.',
           timestamp: new Date(Date.now() - 1800000).toISOString(),
           reactions: { '🚀': ['user_moderator_uuid', 'user_regular_member_uuid'], '👍': ['user_owner_uuid'] },
         },
@@ -88,9 +88,18 @@
           senderId: 'user_moderator_uuid',
           senderName: 'Bob (Moderator)',
           role: 'moderator',
-          text: 'Try clicking the "Test XSS" button in the composer below to verify that malicious script tags are rendered harmlessly without executing!',
-          timestamp: new Date(Date.now() - 600000).toISOString(),
-          reactions: { '🛡️': ['user_owner_uuid'] },
+          text: 'Verified the PostgreSQL audit trail for channel actions. Everything from member mutes to message deletion is logging cleanly with actors and timestamps.',
+          timestamp: new Date(Date.now() - 900000).toISOString(),
+          reactions: { '🛡️': ['user_owner_uuid'], '🔥': ['user_regular_member_uuid'] },
+        },
+        {
+          id: 'msg_welcome_4',
+          senderId: 'user_regular_member_uuid',
+          senderName: 'Charlie (Member)',
+          role: 'member',
+          text: 'Awesome! Live typing indicators and presence tracking look super crisp in this new UI ✨',
+          timestamp: new Date(Date.now() - 300000).toISOString(),
+          reactions: { '❤️': ['user_owner_uuid', 'user_moderator_uuid'] },
         },
       ],
       room_engineering_uuid: [
@@ -99,8 +108,16 @@
           senderId: 'user_owner_uuid',
           senderName: 'Alice (Owner)',
           role: 'owner',
-          text: 'Private engineering channel active. Audit logs are tracking all moderation events.',
+          text: 'Private engineering channel initialized. All infrastructure logs and moderation events are tracked.',
           timestamp: new Date(Date.now() - 900000).toISOString(),
+        },
+        {
+          id: 'msg_eng_2',
+          senderId: 'user_moderator_uuid',
+          senderName: 'Bob (Moderator)',
+          role: 'moderator',
+          text: 'Redis session cache and heartbeat workers are healthy across all nodes.',
+          timestamp: new Date(Date.now() - 450000).toISOString(),
         },
       ],
     },
@@ -1191,11 +1208,48 @@
     }
   }
 
+  function openDrawerIfNotOpen() {
+    const drawer = document.getElementById('sideDrawer');
+    if (drawer && drawer.classList.contains('collapsed')) {
+      drawer.classList.remove('collapsed');
+      drawer.classList.add('open');
+    }
+  }
+
   function toggleSidebar() {
     const sidebar = document.getElementById('leftSidebar');
     if (sidebar) {
       sidebar.classList.toggle('open');
     }
+  }
+
+  function insertCodeSnippet() {
+    const input = document.getElementById('composerInput');
+    if (!input) return;
+    const sample = '```javascript\n// Real-time Socket.IO event handler\nsocket.emit("message:send", {\n  text: "Hello from HyperChat!"\n});\n```';
+    input.value = (input.value ? input.value + '\n' : '') + sample;
+    input.focus();
+  }
+
+  function insertEmoji(emoji = '✨') {
+    const input = document.getElementById('composerInput');
+    if (!input) return;
+    input.value = (input.value ? input.value + ' ' : '') + emoji;
+    input.focus();
+  }
+
+  function filterNavigation(query) {
+    const q = (query || '').toLowerCase().trim();
+    const channels = document.querySelectorAll('#channelsList .channel-item');
+    channels.forEach((item) => {
+      const text = item.textContent.toLowerCase();
+      item.style.display = text.includes(q) ? 'flex' : 'none';
+    });
+    const contacts = document.querySelectorAll('#contactsList .contact-item');
+    contacts.forEach((item) => {
+      const text = item.textContent.toLowerCase();
+      item.style.display = text.includes(q) ? 'flex' : 'none';
+    });
   }
 
   // --- INITIALIZATION ---
@@ -1213,7 +1267,7 @@
       TEST_PERSONAS.forEach((p) => {
         const opt = document.createElement('option');
         opt.value = p.id;
-        opt.textContent = `${p.username} [${p.role.toUpperCase()}]`;
+        opt.textContent = `${p.username} (${p.role.toUpperCase()})`;
         select.appendChild(opt);
       });
       select.value = state.currentUser.id;
@@ -1268,6 +1322,9 @@
     init,
     sendMessage,
     insertXssPayload,
+    insertCodeSnippet,
+    insertEmoji,
+    filterNavigation,
     toggleReaction,
     switchRoom,
     switchPersona,
@@ -1284,6 +1341,7 @@
     confirmCreateRoom,
     setDrawerTab,
     toggleDrawer,
+    openDrawerIfNotOpen,
     toggleSidebar,
     loadAuditLogs,
   };
