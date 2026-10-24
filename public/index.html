@@ -48,7 +48,7 @@
             <circle cx="11" cy="11" r="8"></circle>
             <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
           </svg>
-          <input type="text" placeholder="Jump to channel or direct message..." id="quickSearchInput" oninput="window.hyperChat.filterNavigation(this.value)" />
+          <input type="text" placeholder="Quick search..." id="quickSearchInput" oninput="window.hyperChat.filterNavigation(this.value)" />
           <kbd class="kbd-shortcut">⌘K</kbd>
         </div>
       </div>
@@ -93,22 +93,24 @@
           </div>
           <div class="user-meta">
             <div class="user-name-row">
-              <span class="user-name" id="personaName">Alice (Owner)</span>
+              <span class="user-name" id="personaName">Alice</span>
               <span class="role-badge owner" id="personaRoleTag">OWNER</span>
             </div>
-            <span class="user-handle" id="personaEmail">alice.owner@chat.local</span>
+            <span class="user-handle" id="personaEmail">alice@chat.internal</span>
           </div>
         </div>
 
-        <!-- Sleek Persona & Role Switcher Popover trigger -->
-        <div class="persona-switch-wrapper" title="Switch active persona to test RBAC roles & permissions">
-          <select id="personaSelect" class="persona-select-custom" aria-label="Select test persona">
-            <!-- Populated dynamically by app.js -->
-          </select>
-          <div class="select-chevron">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-              <polyline points="6 9 12 15 18 9"></polyline>
-            </svg>
+        <!-- Persona & Role Switcher -->
+        <div class="persona-switch-section">
+          <div class="persona-switch-wrapper" title="Switch active persona to test RBAC roles & permissions">
+            <select id="personaSelect" class="persona-select-custom" aria-label="Select test persona">
+              <!-- Populated dynamically by app.js -->
+            </select>
+            <div class="select-chevron">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="6 9 12 15 18 9"></polyline>
+              </svg>
+            </div>
           </div>
         </div>
       </div>
