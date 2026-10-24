@@ -1,4 +1,4 @@
--- Migration: 002_user_registration_uniqueness.up.sql
+-- Migration: 003_user_registration_uniqueness.up.sql
 -- Description: Enforce case-insensitive uniqueness for user emails and usernames.
 
 DO $$

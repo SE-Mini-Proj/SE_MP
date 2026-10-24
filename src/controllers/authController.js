@@ -19,15 +19,21 @@ async function register(req, res, next) {
 
 async function login(req, res, next) {
   try {
-    const { email, password } = req.body;
-    if (!email || !password) {
+    const { email, username, identifier, password } = req.body;
+    const loginId = identifier || email || username;
+
+    if (!loginId || !password) {
       return res.status(400).json({
         code: 'VALIDATION_ERROR',
-        message: 'Email and password are required',
+        message: 'Username/email and password are required',
       });
     }
 
-    const result = await authService.loginUser({ email, password });
+    const result = await authService.loginUser({
+      email: loginId,
+      username: loginId,
+      password,
+    });
     return res.status(200).json(result);
   } catch (error) {
     next(error);
