@@ -4,6 +4,7 @@ const { setTimeout, clearTimeout } = require('node:timers');
 const ioClient = require('socket.io-client');
 const app = require('../src/app');
 const { initializeSocket } = require('../src/sockets');
+const { generateToken } = require('../src/services/authService');
 
 jest.mock('../src/cache/redisPubSub', () => ({
   INSTANCE_ID: 'test-instance',
@@ -72,26 +73,30 @@ describe('WebSocket Gateway - Socket.IO Integration', () => {
     }
   });
 
-  it('should connect and receive connection:ack event', async () => {
+  it('should connect with a valid JWT and receive connection-ack', async () => {
     await new Promise((resolve, reject) => {
       clientSocket = ioClient(`http://127.0.0.1:${serverPort}`, {
         auth: {
-          token: 'mock_jwt_for_test',
-          userId: 'user_tester_1',
+          token: generateToken({
+            id: 'user_tester_1',
+            email: 'tester@example.com',
+            username: 'tester',
+          }).token,
         },
         transports: ['websocket'],
       });
 
       const timeout = setTimeout(() => {
-        reject(new Error('Timed out waiting for connection:ack'));
+        reject(new Error('Timed out waiting for connection-ack'));
       }, 10000);
 
-      clientSocket.once('connection:ack', (ack) => {
+      clientSocket.once('connection-ack', (ack) => {
         clearTimeout(timeout);
 
         try {
           expect(ack.status).toBe('connected');
           expect(ack.user.id).toBe('user_tester_1');
+          expect(ack.user.authenticated).toBe(true);
           expect(ack).toHaveProperty('timestamp');
           resolve();
         } catch (error) {
@@ -105,6 +110,74 @@ describe('WebSocket Gateway - Socket.IO Integration', () => {
       });
     });
   }, 15000);
+
+
+  it('should reject a connection without a JWT', async () => {
+    const unauthenticatedClient = ioClient(
+      `http://127.0.0.1:${serverPort}`,
+      {
+        transports: ['websocket'],
+        reconnection: false,
+      }
+    );
+
+    try {
+      const error = await new Promise((resolve, reject) => {
+        const timeout = setTimeout(
+          () => reject(new Error('Timed out waiting for authentication rejection')),
+          5000
+        );
+
+        unauthenticatedClient.once('connect', () => {
+          clearTimeout(timeout);
+          reject(new Error('Unauthenticated client unexpectedly connected'));
+        });
+
+        unauthenticatedClient.once('connect_error', (err) => {
+          clearTimeout(timeout);
+          resolve(err);
+        });
+      });
+
+      expect(error.message).toMatch(/Authentication required/);
+    } finally {
+      unauthenticatedClient.disconnect();
+    }
+  }, 10000);
+
+  it('should reject an invalid JWT', async () => {
+    const unauthenticatedClient = ioClient(
+      `http://127.0.0.1:${serverPort}`,
+      {
+        auth: { token: 'not-a-valid-jwt' },
+        transports: ['websocket'],
+        reconnection: false,
+      }
+    );
+
+    try {
+      const error = await new Promise((resolve, reject) => {
+        const timeout = setTimeout(
+          () => reject(new Error('Timed out waiting for authentication rejection')),
+          5000
+        );
+
+        unauthenticatedClient.once('connect', () => {
+          clearTimeout(timeout);
+          reject(new Error('Client with invalid JWT unexpectedly connected'));
+        });
+
+        unauthenticatedClient.once('connect_error', (err) => {
+          clearTimeout(timeout);
+          resolve(err);
+        });
+      });
+
+      expect(error.message).toMatch(/Invalid or expired authentication token/);
+    } finally {
+      unauthenticatedClient.disconnect();
+    }
+  }, 10000);
 
   it('should echo or broadcast sent messages via message:receive', async () => {
     const testPayload = {

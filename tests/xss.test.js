@@ -6,6 +6,7 @@ const app = require('../src/app');
 const { initializeSocket } = require('../src/sockets');
 const { escapeHtml, sanitizeMessage, stripDangerousTags, sanitizeDeep } = require('../src/utils/sanitizer');
 const messagingService = require('../src/services/messagingService');
+const { generateToken } = require('../src/services/authService');
 
 describe('Security Requirement: XSS Sanitisation of Message Content (Issue #9 - CHAT-SR-004, TC-Sec-04)', () => {
   let server;
@@ -128,13 +129,25 @@ describe('Security Requirement: XSS Sanitisation of Message Content (Issue #9 - 
     let clientB;
 
     beforeAll(async () => {
+      const tokenA = generateToken({
+        id: 'user_sender',
+        email: 'sender@example.com',
+        username: 'sender',
+      }).token;
+
+      const tokenB = generateToken({
+        id: 'user_recipient',
+        email: 'recipient@example.com',
+        username: 'recipient',
+      }).token;
+
       clientA = ioClient(`http://localhost:${serverPort}`, {
-        auth: { token: 'mock_jwt_token_user_a', userId: 'user_sender' },
+        auth: { token: tokenA },
         transports: ['websocket'],
       });
 
       clientB = ioClient(`http://localhost:${serverPort}`, {
-        auth: { token: 'mock_jwt_token_user_b', userId: 'user_recipient' },
+        auth: { token: tokenB },
         transports: ['websocket'],
       });
 

@@ -5,6 +5,7 @@ const ioClient = require('socket.io-client');
 const app = require('../src/app');
 const config = require('../src/config');
 const { initializeSocket } = require('../src/sockets');
+const { generateToken } = require('../src/services/authService');
 
 describe('Security Requirement: TLS 1.2+ Transport Security (Issue #6 - CHAT-SR-001, TC-Sec-01)', () => {
   let server;
@@ -120,7 +121,13 @@ describe('Security Requirement: TLS 1.2+ Transport Security (Issue #6 - CHAT-SR-
           extraHeaders: {
             'x-forwarded-proto': 'https',
           },
-          auth: { token: 'mock_jwt_token', userId: 'tls_user_1' },
+          auth: {
+            token: generateToken({
+              id: 'tls_user_1',
+              email: 'tls-user@example.com',
+              username: 'tls_user',
+            }).token,
+          },
           reconnection: false,
         });
 
