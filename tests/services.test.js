@@ -6,7 +6,12 @@ jest.mock('../src/models/userModel', () => ({
   create: jest.fn(),
 }));
 
+jest.mock('../src/models/roomModel', () => ({
+  create: jest.fn(),
+}));
+
 const UserModel = require('../src/models/userModel');
+const RoomModel = require('../src/models/roomModel');
 const {
   registerUser,
   loginUser,
@@ -69,6 +74,16 @@ describe('Auth service', () => {
 });
 
 describe('Room service', () => {
+  beforeEach(() => {
+    RoomModel.create.mockResolvedValue({
+      id: 'room-1',
+      name: 'Engineering',
+      isPrivate: true,
+      ownerId: 'user-1',
+      createdAt: '2026-10-26T00:00:00.000Z',
+    });
+  });
+
   it('creates a room with its owner as the initial member', async () => {
     const result = await createRoom({
       name: 'Engineering',
@@ -84,6 +99,18 @@ describe('Room service', () => {
       members: ['user-1'],
     });
     expect(result.room.id).toBeTruthy();
+    expect(RoomModel.create).toHaveBeenCalledWith({
+      name: 'Engineering',
+      isPrivate: true,
+      ownerId: 'user-1',
+    });
+  });
+
+  it('rejects a blank room name or missing owner', async () => {
+    await expect(createRoom({ name: '  ', ownerId: 'user-1' }))
+      .rejects.toMatchObject({ code: 'VALIDATION_ERROR', status: 400 });
+    await expect(createRoom({ name: 'Engineering' }))
+      .rejects.toMatchObject({ code: 'UNAUTHORIZED', status: 401 });
   });
 
   it('joins a room for the provided user', async () => {

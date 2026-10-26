@@ -52,6 +52,10 @@ errors.
 Direct messages to offline users are kept in a per-recipient Redis queue and
 delivered in FIFO order when that user reconnects.
 
+Authenticated users can create named chat rooms with `POST /api/rooms`.
+Room creation and adding the creator as the room owner/member are committed
+atomically in PostgreSQL.
+
 ### Running the Application
 ```bash
 # Start development server with live reload
