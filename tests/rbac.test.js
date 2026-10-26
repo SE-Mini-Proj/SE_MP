@@ -210,7 +210,7 @@ describe('Security Requirement: RBAC & Audit Logging for Moderation Actions (Iss
     it('should allow platform admin to bypass room role and execute actions', async () => {
       const res = await request(app)
         .post(`/api/rooms/${roomId}/members/${targetMemberId}/ban`)
-        .set('Authorization', `Bearer ${validToken('global_admin_id', 'admin')}`)
+        .set('Authorization', `Bearer ${validToken('global_admin_id', 'admin')}`);
         .send({ reason: 'Platform wide ban' });
 
       expect(res.status).toBe(200);

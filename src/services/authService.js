@@ -80,6 +80,7 @@ function generateToken(user, lifetimeSeconds = getTokenLifetimeSeconds()) {
     id: user.id,
     email: user.email,
     username: user.username,
+    role: user.role,
   };
 
   const token = jwt.sign(payload, secret, {
