@@ -179,6 +179,44 @@ describe('WebSocket Gateway - Socket.IO Integration', () => {
     }
   }, 10000);
 
+  it('should reject socket events after the JWT expires', async () => {
+    const expiringClient = ioClient(`http://127.0.0.1:${serverPort}`, {
+      auth: {
+        token: generateToken({
+          id: 'user_expiring',
+          email: 'expiring@example.com',
+          username: 'expiring',
+        }, 1).token,
+      },
+      transports: ['websocket'],
+      reconnection: false,
+    });
+
+    try {
+      await new Promise((resolve, reject) => {
+        expiringClient.once('connect', resolve);
+        expiringClient.once('connect_error', reject);
+      });
+      await new Promise((resolve) => setTimeout(resolve, 1100));
+
+      const authError = new Promise((resolve, reject) => {
+        const timeout = setTimeout(
+          () => reject(new Error('Timed out waiting for the authentication error')),
+          5000
+        );
+        expiringClient.once('auth:error', (error) => {
+          clearTimeout(timeout);
+          resolve(error);
+        });
+      });
+      expiringClient.emit('message:send', { text: 'must not be processed' });
+
+      await expect(authError).resolves.toMatchObject({ code: 'INVALID_TOKEN' });
+    } finally {
+      expiringClient.disconnect();
+    }
+  }, 10000);
+
   it('should echo or broadcast sent messages via message:receive', async () => {
     const testPayload = {
       text: 'Hello, Antigravity Chat!',

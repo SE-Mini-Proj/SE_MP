@@ -44,6 +44,10 @@ Copy `.env.example` to `.env` and adjust the variables as needed:
 ```bash
 cp .env.example .env
 ```
+JWTs are signed with `JWT_SECRET` and expire according to `JWT_EXPIRES_IN`,
+capped at 24 hours. Protected REST routes and every incoming Socket.IO event
+verify the token; invalid or expired tokens are rejected with authentication
+errors.
 
 ### Running the Application
 ```bash

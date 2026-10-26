@@ -65,6 +65,7 @@ function initializeSocket(httpServer) {
         username: decoded.username,
         authenticated: true,
       };
+      socket.authToken = token;
 
       return next();
     } catch {
@@ -113,6 +114,21 @@ function initializeSocket(httpServer) {
   }
 
   io.on('connection', (socket) => {
+    socket.use((_packet, next) => {
+      try {
+        verifyToken(socket.authToken);
+        return next();
+      } catch {
+        const error = new Error('Invalid or expired authentication token');
+        error.data = { code: 'INVALID_TOKEN' };
+        socket.emit('auth:error', {
+          code: 'INVALID_TOKEN',
+          message: error.message,
+        });
+        return next(error);
+      }
+    });
+
     if (config.nodeEnv !== 'test') {
       console.log(
         `[WebSocket] Client connected: ${socket.id} (User: ${socket.user.id})`
