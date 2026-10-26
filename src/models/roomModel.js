@@ -14,18 +14,37 @@ class RoomModel {
   }
 
   static async create({ name, isPrivate = false, ownerId = null }) {
-    const queryText = `
-      INSERT INTO rooms (name, is_private, owner_id)
-      VALUES ($1, $2, $3)
-      RETURNING id, name, is_private, owner_id, created_at, updated_at;
-    `;
-    const res = await db.query(queryText, [name, isPrivate, ownerId]);
-    const room = new RoomModel(res.rows[0]);
+    const client = await db.getClient();
+    try {
+      await client.query('BEGIN');
+      const roomResult = await client.query(
+        `INSERT INTO rooms (name, is_private, owner_id)
+         VALUES ($1, $2, $3)
+         RETURNING id, name, is_private, owner_id, created_at, updated_at;`,
+        [name, isPrivate, ownerId]
+      );
+      const room = new RoomModel(roomResult.rows[0]);
 
-    if (ownerId) {
-      await RoomModel.addMember({ roomId: room.id, userId: ownerId, role: 'owner' });
+      if (ownerId) {
+        await client.query(
+          `INSERT INTO room_members (room_id, user_id, role)
+           VALUES ($1, $2, 'owner');`,
+          [room.id, ownerId]
+        );
+      }
+
+      await client.query('COMMIT');
+      return room;
+    } catch (error) {
+      try {
+        await client.query('ROLLBACK');
+      } catch (rollbackError) {
+        console.error('[Room Model] Failed to roll back room creation:', rollbackError.message);
+      }
+      throw error;
+    } finally {
+      client.release();
     }
-    return room;
   }
 
   static async findById(id) {

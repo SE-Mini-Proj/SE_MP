@@ -1,9 +1,15 @@
 const { describe, it, expect } = require('@jest/globals');
 const request = require('supertest');
 const jwt = require('jsonwebtoken');
+
+jest.mock('../src/models/roomModel', () => ({
+  create: jest.fn(),
+}));
+
 const app = require('../src/app');
 const config = require('../src/config');
 const { generateToken } = require('../src/services/authService');
+const RoomModel = require('../src/models/roomModel');
 
 describe('JWT authentication validation', () => {
   it('rejects tampered tokens on protected REST routes', async () => {
@@ -40,6 +46,13 @@ describe('JWT authentication validation', () => {
 
   it('accepts a valid token and authenticates the request user', async () => {
     const { token } = generateToken({ id: 'user-1' });
+    RoomModel.create.mockResolvedValue({
+      id: 'room-1',
+      name: 'Engineering',
+      isPrivate: false,
+      ownerId: 'user-1',
+      createdAt: new Date('2026-10-26T00:00:00.000Z'),
+    });
 
     const response = await request(app)
       .post('/api/rooms')
@@ -47,6 +60,11 @@ describe('JWT authentication validation', () => {
       .send({ name: 'Engineering' });
 
     expect(response.status).toBe(201);
+    expect(RoomModel.create).toHaveBeenCalledWith({
+      name: 'Engineering',
+      isPrivate: false,
+      ownerId: 'user-1',
+    });
     expect(response.body.room.ownerId).toBe('user-1');
   });
 });
