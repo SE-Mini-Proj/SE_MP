@@ -35,9 +35,27 @@ jest.mock('../src/cache/presenceService', () => ({
     results: [],
   }),
   getUserSessions: jest.fn().mockResolvedValue([]),
-  isUserOnline: jest.fn().mockResolvedValue(false),
+  isUserOnline: jest.fn().mockResolvedValue(true),
   getOnlineUsers: jest.fn().mockResolvedValue([]),
 }));
+
+jest.mock('../src/services/offlineMessageService', () => {
+  const queues = new Map();
+  return {
+    enqueueOfflineMessage: jest.fn(async (recipientId, message) => {
+      const queue = queues.get(recipientId) || [];
+      queue.push(message);
+      queues.set(recipientId, queue);
+    }),
+    drainOfflineMessages: jest.fn(async (recipientId) => {
+      const queue = queues.get(recipientId) || [];
+      queues.delete(recipientId);
+      return queue;
+    }),
+  };
+});
+
+const { isUserOnline } = require('../src/cache/presenceService');
 
 describe('WebSocket Gateway - Socket.IO Integration', () => {
   let server;
@@ -272,6 +290,68 @@ describe('WebSocket Gateway - Socket.IO Integration', () => {
       expect(senderReceivedMessage).not.toHaveBeenCalled();
     } finally {
       clientSocket.off('message:receive', senderReceivedMessage);
+      recipientSocket.disconnect();
+    }
+  }, 15000);
+
+  it('queues offline direct messages and delivers them in order on reconnect', async () => {
+    const recipientId = 'user_offline_recipient';
+    isUserOnline.mockResolvedValueOnce(false).mockResolvedValueOnce(false);
+
+    const sendMessage = (clientMsgId, text) => new Promise((resolve, reject) => {
+      clientSocket.emit(
+        'message:send',
+        { recipientId, clientMsgId, text },
+        (response) => {
+          if (response.error) reject(new Error(response.error.message));
+          else resolve(response);
+        }
+      );
+    });
+
+    const firstQueued = await sendMessage('offline-1', 'First message');
+    const secondQueued = await sendMessage('offline-2', 'Second message');
+    expect(firstQueued.status).toBe('queued');
+    expect(secondQueued.status).toBe('queued');
+
+    const receivedMessages = [];
+    const recipientSocket = ioClient(`http://127.0.0.1:${serverPort}`, {
+      auth: {
+        token: generateToken({
+          id: recipientId,
+          email: 'offline@example.com',
+          username: 'offline',
+        }).token,
+      },
+      transports: ['websocket'],
+    });
+
+    try {
+      const allMessagesReceived = new Promise((resolve, reject) => {
+        const timeout = setTimeout(
+          () => reject(new Error('Timed out waiting for queued messages')),
+          5000
+        );
+        recipientSocket.on('message:receive', (message) => {
+          receivedMessages.push(message);
+          if (receivedMessages.length === 2) {
+            clearTimeout(timeout);
+            resolve();
+          }
+        });
+      });
+
+      await new Promise((resolve, reject) => {
+        recipientSocket.once('connection:ack', resolve);
+        recipientSocket.once('connect_error', reject);
+      });
+      await allMessagesReceived;
+
+      expect(receivedMessages.map((message) => message.clientMsgId))
+        .toEqual(['offline-1', 'offline-2']);
+      expect(receivedMessages.map((message) => message.text))
+        .toEqual(['First message', 'Second message']);
+    } finally {
       recipientSocket.disconnect();
     }
   }, 15000);

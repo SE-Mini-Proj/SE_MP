@@ -7,7 +7,9 @@ const {
   INSTANCE_ID,
   publishPresenceEvent,
   publishRoomEvent,
+  publishMessage,
 } = require('../../cache/redisPubSub');
+const { drainOfflineMessages } = require('../../services/offlineMessageService');
 
 function registerPresenceHandler(io, socket) {
   const userId = socket.user?.id || socket.id;
@@ -18,6 +20,26 @@ function registerPresenceHandler(io, socket) {
     instanceId: INSTANCE_ID,
   })
     .then(async (session) => {
+      try {
+        const queuedMessages = await drainOfflineMessages(userId);
+        for (const message of queuedMessages) {
+          io.to(`user:${userId}`).emit('message:receive', message);
+          try {
+            await publishMessage(message);
+          } catch (error) {
+            console.error(
+              '[Messaging] Queued message was delivered locally but Redis publish failed:',
+              error.message
+            );
+          }
+        }
+      } catch (error) {
+        console.error(
+          `[Messaging] Failed to drain offline messages for ${userId}:`,
+          error.message
+        );
+      }
+
       if (session.isFirstSession) {
         await publishPresenceEvent({
           eventName: 'user:online',
