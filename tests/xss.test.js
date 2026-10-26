@@ -179,7 +179,7 @@ describe('Security Requirement: XSS Sanitisation of Message Content (Issue #9 - 
         });
 
         clientA.emit('message:send', {
-          roomId: null,
+          recipientId: 'user_recipient',
           text: xssPayload,
           clientMsgId: 'msg_sec_test_04',
         });

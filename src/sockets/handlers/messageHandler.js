@@ -5,7 +5,7 @@ const { publishMessage } = require('../../cache/redisPubSub');
 function registerMessageHandler(io, socket) {
   socket.on('message:send', async (payload, callback) => {
     try {
-      const { roomId, text, clientMsgId } = payload || {};
+      const { roomId, recipientId, text, clientMsgId } = payload || {};
 
       if (typeof text !== 'string' || text.trim() === '') {
         const errorPayload = {
@@ -22,27 +22,45 @@ function registerMessageHandler(io, socket) {
         return;
       }
 
+      if (roomId && recipientId) {
+        const errorPayload = {
+          code: 'BAD_REQUEST',
+          message: 'A message must target either a room or one recipient',
+        };
+        socket.emit('message:error', errorPayload);
+        if (typeof callback === 'function') callback({ error: errorPayload });
+        return;
+      }
+
+      if (!roomId && (typeof recipientId !== 'string' || !recipientId.trim())) {
+        const errorPayload = {
+          code: 'BAD_REQUEST',
+          message: 'recipientId is required for a direct message',
+        };
+        socket.emit('message:error', errorPayload);
+        if (typeof callback === 'function') callback({ error: errorPayload });
+        return;
+      }
+
       const message = await messagingService.processMessage({
         roomId,
+        recipientId,
         text,
         senderId: socket.user?.id || socket.id,
         clientMsgId,
       });
 
-      // Broadcast locally so messaging still works without Redis.
       if (roomId) {
         io.to(roomId).emit('message:receive', message);
       } else {
-        io.emit('message:receive', message);
+        io.to(`user:${recipientId}`).emit('message:receive', message);
       }
 
-      // Redis distributes the message to other application instances.
-      // A Redis failure must not prevent local message delivery.
       try {
         await publishMessage(message);
       } catch (redisError) {
         console.error(
-          '[Messaging] Redis publish failed; message was delivered locally:',
+          '[Messaging] Redis publish failed after local delivery:',
           redisError.message
         );
       }

@@ -7,7 +7,13 @@ jest.mock('../src/models/userModel', () => ({
 }));
 
 const UserModel = require('../src/models/userModel');
-const { registerUser, loginUser } = require('../src/services/authService');
+const {
+  registerUser,
+  loginUser,
+  verifyToken,
+  getTokenLifetimeSeconds,
+  MAX_TOKEN_LIFETIME_SECONDS,
+} = require('../src/services/authService');
 const { createRoom, joinRoom } = require('../src/services/roomService');
 const { processMessage } = require('../src/services/messagingService');
 
@@ -52,6 +58,13 @@ describe('Auth service', () => {
     expect(result.status).toBe('ok');
     expect(result.token).toBeTruthy();
     expect(result.user.email).toBe('alice@example.com');
+    const claims = verifyToken(result.token);
+    expect(claims.sub).toBe(result.user.id);
+    expect(claims.exp - claims.iat).toBeLessThanOrEqual(MAX_TOKEN_LIFETIME_SECONDS);
+  });
+
+  it('caps configured JWT lifetimes at 24 hours', () => {
+    expect(getTokenLifetimeSeconds('48h')).toBe(MAX_TOKEN_LIFETIME_SECONDS);
   });
 });
 
@@ -88,6 +101,7 @@ describe('Messaging service', () => {
   it('trims message text and preserves correlation metadata', async () => {
     const result = await processMessage({
       roomId: 'room-1',
+      recipientId: null,
       senderId: 'user-1',
       clientMsgId: 'client-1',
       text: '  Hello  ',

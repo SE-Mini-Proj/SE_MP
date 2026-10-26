@@ -9,6 +9,7 @@ const {
   clearInMemoryLogs,
 } = require('../src/services/auditService');
 const ModerationService = require('../src/services/moderationService');
+const { generateToken } = require('../src/services/authService');
 const {
   ROLES,
   setMockRoomRole,
@@ -23,7 +24,7 @@ describe('Security Requirement: RBAC & Audit Logging for Moderation Actions (Iss
   const targetMemberId = 'user_bad_actor_uuid';
   const messageId = 'msg_spam_12345';
 
-  const validToken = 'valid_mock_token_12345';
+  const validToken = (userId, role) => generateToken({ id: userId, role }).token;
 
   beforeEach(() => {
     clearInMemoryLogs();
@@ -49,8 +50,7 @@ describe('Security Requirement: RBAC & Audit Logging for Moderation Actions (Iss
     it('should deny non-privileged members (HTTP 403 Forbidden) from muting a user', async () => {
       const res = await request(app)
         .post(`/api/rooms/${roomId}/members/${targetMemberId}/mute`)
-        .set('Authorization', `Bearer ${validToken}`)
-        .set('x-user-id', memberId)
+        .set('Authorization', `Bearer ${validToken(memberId)}`)
         .send({ reason: 'trying to mute without permission' });
 
       expect(res.status).toBe(403);
@@ -61,8 +61,7 @@ describe('Security Requirement: RBAC & Audit Logging for Moderation Actions (Iss
     it('should deny non-privileged members (HTTP 403 Forbidden) from banning a user', async () => {
       const res = await request(app)
         .post(`/api/rooms/${roomId}/members/${targetMemberId}/ban`)
-        .set('Authorization', `Bearer ${validToken}`)
-        .set('x-user-id', memberId)
+        .set('Authorization', `Bearer ${validToken(memberId)}`)
         .send({ reason: 'unauthorized ban attempt' });
 
       expect(res.status).toBe(403);
@@ -72,8 +71,7 @@ describe('Security Requirement: RBAC & Audit Logging for Moderation Actions (Iss
     it('should deny non-privileged members (HTTP 403 Forbidden) from unbanning a user', async () => {
       const res = await request(app)
         .post(`/api/rooms/${roomId}/members/${targetMemberId}/unban`)
-        .set('Authorization', `Bearer ${validToken}`)
-        .set('x-user-id', memberId)
+        .set('Authorization', `Bearer ${validToken(memberId)}`)
         .send();
 
       expect(res.status).toBe(403);
@@ -83,8 +81,7 @@ describe('Security Requirement: RBAC & Audit Logging for Moderation Actions (Iss
     it('should deny non-privileged members (HTTP 403 Forbidden) from deleting messages', async () => {
       const res = await request(app)
         .delete(`/api/rooms/${roomId}/messages/${messageId}`)
-        .set('Authorization', `Bearer ${validToken}`)
-        .set('x-user-id', memberId)
+        .set('Authorization', `Bearer ${validToken(memberId)}`)
         .send();
 
       expect(res.status).toBe(403);
@@ -94,8 +91,7 @@ describe('Security Requirement: RBAC & Audit Logging for Moderation Actions (Iss
     it('should deny non-privileged members (HTTP 403 Forbidden) from removing members', async () => {
       const res = await request(app)
         .delete(`/api/rooms/${roomId}/members/${targetMemberId}`)
-        .set('Authorization', `Bearer ${validToken}`)
-        .set('x-user-id', memberId)
+        .set('Authorization', `Bearer ${validToken(memberId)}`)
         .send();
 
       expect(res.status).toBe(403);
@@ -105,8 +101,7 @@ describe('Security Requirement: RBAC & Audit Logging for Moderation Actions (Iss
     it('should deny non-privileged members (HTTP 403 Forbidden) from viewing audit logs', async () => {
       const res = await request(app)
         .get(`/api/rooms/${roomId}/audit-logs`)
-        .set('Authorization', `Bearer ${validToken}`)
-        .set('x-user-id', memberId);
+        .set('Authorization', `Bearer ${validToken(memberId)}`);
 
       expect(res.status).toBe(403);
       expect(res.body).toHaveProperty('code', 'FORBIDDEN');
@@ -117,8 +112,7 @@ describe('Security Requirement: RBAC & Audit Logging for Moderation Actions (Iss
     it('should allow room owner to mute a user and record audit log', async () => {
       const res = await request(app)
         .post(`/api/rooms/${roomId}/members/${targetMemberId}/mute`)
-        .set('Authorization', `Bearer ${validToken}`)
-        .set('x-user-id', ownerId)
+        .set('Authorization', `Bearer ${validToken(ownerId)}`)
         .send({ reason: 'Repeated offensive remarks' });
 
       expect(res.status).toBe(200);
@@ -140,8 +134,7 @@ describe('Security Requirement: RBAC & Audit Logging for Moderation Actions (Iss
       // Mute by moderator
       const muteRes = await request(app)
         .post(`/api/rooms/${roomId}/members/${targetMemberId}/mute`)
-        .set('Authorization', `Bearer ${validToken}`)
-        .set('x-user-id', moderatorId)
+        .set('Authorization', `Bearer ${validToken(moderatorId)}`)
         .send({ reason: 'Disruptive behavior' });
 
       expect(muteRes.status).toBe(200);
@@ -150,8 +143,7 @@ describe('Security Requirement: RBAC & Audit Logging for Moderation Actions (Iss
       // Unmute by moderator
       const unmuteRes = await request(app)
         .post(`/api/rooms/${roomId}/members/${targetMemberId}/unmute`)
-        .set('Authorization', `Bearer ${validToken}`)
-        .set('x-user-id', moderatorId)
+        .set('Authorization', `Bearer ${validToken(moderatorId)}`)
         .send({ reason: 'Time-out completed' });
 
       expect(unmuteRes.status).toBe(200);
@@ -166,8 +158,7 @@ describe('Security Requirement: RBAC & Audit Logging for Moderation Actions (Iss
     it('should allow room owner to ban a user and verify audit log record', async () => {
       const res = await request(app)
         .post(`/api/rooms/${roomId}/members/${targetMemberId}/ban`)
-        .set('Authorization', `Bearer ${validToken}`)
-        .set('x-user-id', ownerId)
+        .set('Authorization', `Bearer ${validToken(ownerId)}`)
         .send({ reason: 'Severe TOS violation' });
 
       expect(res.status).toBe(200);
@@ -184,8 +175,7 @@ describe('Security Requirement: RBAC & Audit Logging for Moderation Actions (Iss
     it('should allow room moderator to delete an inappropriate message with audit trail', async () => {
       const res = await request(app)
         .delete(`/api/rooms/${roomId}/messages/${messageId}`)
-        .set('Authorization', `Bearer ${validToken}`)
-        .set('x-user-id', moderatorId)
+        .set('Authorization', `Bearer ${validToken(moderatorId)}`)
         .send({ reason: 'Inappropriate content' });
 
       expect(res.status).toBe(200);
@@ -203,8 +193,7 @@ describe('Security Requirement: RBAC & Audit Logging for Moderation Actions (Iss
     it('should allow room owner to remove a member (CHAT-F-023)', async () => {
       const res = await request(app)
         .delete(`/api/rooms/${roomId}/members/${targetMemberId}`)
-        .set('Authorization', `Bearer ${validToken}`)
-        .set('x-user-id', ownerId)
+        .set('Authorization', `Bearer ${validToken(ownerId)}`)
         .send({ reason: 'Evicted by room owner' });
 
       expect(res.status).toBe(200);
@@ -221,9 +210,7 @@ describe('Security Requirement: RBAC & Audit Logging for Moderation Actions (Iss
     it('should allow platform admin to bypass room role and execute actions', async () => {
       const res = await request(app)
         .post(`/api/rooms/${roomId}/members/${targetMemberId}/ban`)
-        .set('Authorization', `Bearer ${validToken}`)
-        .set('x-user-id', 'global_admin_id')
-        .set('x-user-role', 'admin')
+        .set('Authorization', `Bearer ${validToken('global_admin_id', 'admin')}`)
         .send({ reason: 'Platform wide ban' });
 
       expect(res.status).toBe(200);
@@ -293,8 +280,7 @@ describe('Security Requirement: RBAC & Audit Logging for Moderation Actions (Iss
 
       const res = await request(app)
         .get(`/api/rooms/${roomId}/audit-logs`)
-        .set('Authorization', `Bearer ${validToken}`)
-        .set('x-user-id', ownerId);
+        .set('Authorization', `Bearer ${validToken(ownerId)}`);
 
       expect(res.status).toBe(200);
       expect(res.body).toHaveProperty('logs');

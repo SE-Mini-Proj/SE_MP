@@ -4,7 +4,7 @@ const { sanitizeMessage } = require('../utils/sanitizer');
  * Messaging Service
  * Validates, sanitizes (XSS prevention - CHAT-SR-004), persists messages, and prepares them for broadcast.
  */
-async function processMessage({ roomId, text, senderId, clientMsgId }) {
+async function processMessage({ roomId, recipientId, text, senderId, clientMsgId }) {
   if (typeof text !== 'string' || text.trim() === '') {
     const error = new Error('Message text cannot be empty');
     error.code = 'EMPTY_MESSAGE';
@@ -19,6 +19,7 @@ async function processMessage({ roomId, text, senderId, clientMsgId }) {
     messageId: 'msg_' + Date.now(),
     clientMsgId: clientMsgId || null,
     roomId: roomId || null,
+    recipientId: recipientId || null,
     senderId: senderId || 'anonymous',
     text: sanitizedText,
     timestamp: new Date().toISOString(),

@@ -5,6 +5,29 @@ const UserModel = require('../models/userModel');
 const lockoutService = require('./lockoutService');
 
 const SALT_ROUNDS = 12;
+const MAX_TOKEN_LIFETIME_SECONDS = 24 * 60 * 60;
+
+function getTokenLifetimeSeconds(expiresIn = config.jwt.expiresIn || '24h') {
+  if (typeof expiresIn === 'number') {
+    if (!Number.isSafeInteger(expiresIn) || expiresIn <= 0) {
+      throw new Error('JWT_EXPIRES_IN must be a positive duration');
+    }
+    return Math.min(expiresIn, MAX_TOKEN_LIFETIME_SECONDS);
+  }
+
+  const match = /^(\d+)(s|m|h|d)$/.exec(expiresIn);
+  if (!match) {
+    throw new Error('JWT_EXPIRES_IN must be a positive duration such as 15m or 24h');
+  }
+
+  const multipliers = { s: 1, m: 60, h: 3600, d: 86400 };
+  const lifetime = Number(match[1]) * multipliers[match[2]];
+  if (!Number.isSafeInteger(lifetime) || lifetime <= 0) {
+    throw new Error('JWT_EXPIRES_IN must be a positive duration');
+  }
+
+  return Math.min(lifetime, MAX_TOKEN_LIFETIME_SECONDS);
+}
 
 /**
  * Hash a plain text password with a secure salt.
@@ -40,32 +63,34 @@ async function verifyPassword(plainTextPassword, hash) {
  * Requirement: CHAT-F-002 (Issue #12)
  *
  * @param {object} user - User entity or payload object
+ * @param {number} [lifetimeSeconds] - Token lifetime, capped at 24 hours
  * @returns {{ token: string, expiresIn: number }}
  */
-function generateToken(user) {
+function generateToken(user, lifetimeSeconds = getTokenLifetimeSeconds()) {
   const secret = config.jwt.secret;
-  const expiresIn = config.jwt.expiresIn || '24h';
+  const expiresIn = lifetimeSeconds;
+  if (!Number.isSafeInteger(expiresIn)
+    || expiresIn <= 0
+    || expiresIn > MAX_TOKEN_LIFETIME_SECONDS) {
+    throw new Error('JWT lifetime must be between 1 second and 24 hours');
+  }
 
   const payload = {
     sub: user.id,
     id: user.id,
     email: user.email,
     username: user.username,
+    role: user.role,
   };
 
-  const token = jwt.sign(payload, secret, { expiresIn });
-
-  const expiresInSeconds = typeof expiresIn === 'number'
-    ? expiresIn
-    : expiresIn.endsWith('h')
-      ? parseInt(expiresIn, 10) * 3600
-      : expiresIn.endsWith('d')
-        ? parseInt(expiresIn, 10) * 86400
-        : 86400;
+  const token = jwt.sign(payload, secret, {
+    expiresIn,
+    algorithm: 'HS256',
+  });
 
   return {
     token,
-    expiresIn: expiresInSeconds,
+    expiresIn,
   };
 }
 
@@ -77,7 +102,22 @@ function generateToken(user) {
  * @returns {object} Decoded token payload
  */
 function verifyToken(token) {
-  return jwt.verify(token, config.jwt.secret);
+  const decoded = jwt.verify(token, config.jwt.secret, {
+    algorithms: ['HS256'],
+  });
+
+  if (typeof decoded !== 'object'
+    || typeof decoded.sub !== 'string'
+    || !decoded.sub
+    || !Number.isSafeInteger(decoded.iat)
+    || !Number.isSafeInteger(decoded.exp)
+    || decoded.iat > Math.floor(Date.now() / 1000)
+    || decoded.exp <= decoded.iat
+    || decoded.exp - decoded.iat > MAX_TOKEN_LIFETIME_SECONDS) {
+    throw new Error('Invalid or expired authentication token');
+  }
+
+  return decoded;
 }
 
 /**
@@ -269,6 +309,8 @@ module.exports = {
   verifyPassword,
   generateToken,
   verifyToken,
+  getTokenLifetimeSeconds,
+  MAX_TOKEN_LIFETIME_SECONDS,
   registerUser,
   loginUser,
   lockoutService,
