@@ -85,8 +85,10 @@ function initializeSocket(httpServer) {
 
       if (event.roomId) {
         io.to(event.roomId).emit('message:receive', event);
+      } else if (event.recipientId) {
+        io.to(`user:${event.recipientId}`).emit('message:receive', event);
       } else {
-        io.emit('message:receive', event);
+        console.error('[Messaging] Dropped direct message without a recipient');
       }
 
       return;
@@ -128,6 +130,8 @@ function initializeSocket(httpServer) {
         return next(error);
       }
     });
+
+    socket.join(`user:${socket.user.id}`);
 
     if (config.nodeEnv !== 'test') {
       console.log(

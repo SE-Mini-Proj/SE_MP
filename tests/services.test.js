@@ -101,6 +101,7 @@ describe('Messaging service', () => {
   it('trims message text and preserves correlation metadata', async () => {
     const result = await processMessage({
       roomId: 'room-1',
+      recipientId: null,
       senderId: 'user-1',
       clientMsgId: 'client-1',
       text: '  Hello  ',

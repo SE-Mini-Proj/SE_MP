@@ -1,6 +1,7 @@
 const { describe, it, expect, beforeAll, afterAll } = require('@jest/globals');
 const http = require('http');
 const { setTimeout, clearTimeout } = require('node:timers');
+const { performance } = require('node:perf_hooks');
 const ioClient = require('socket.io-client');
 const app = require('../src/app');
 const { initializeSocket } = require('../src/sockets');
@@ -217,32 +218,61 @@ describe('WebSocket Gateway - Socket.IO Integration', () => {
     }
   }, 10000);
 
-  it('should echo or broadcast sent messages via message:receive', async () => {
+  it('delivers a direct message to the online recipient within one second', async () => {
     const testPayload = {
       text: 'Hello, Antigravity Chat!',
       clientMsgId: 'client_msg_12345',
+      recipientId: 'user_recipient',
     };
+    const recipientSocket = ioClient(`http://127.0.0.1:${serverPort}`, {
+      auth: {
+        token: generateToken({
+          id: testPayload.recipientId,
+          email: 'recipient@example.com',
+          username: 'recipient',
+        }).token,
+      },
+      transports: ['websocket'],
+    });
+    const senderReceivedMessage = jest.fn();
+    clientSocket.on('message:receive', senderReceivedMessage);
 
-    await new Promise((resolve, reject) => {
-      const timeout = setTimeout(() => {
-        reject(new Error('Timed out waiting for message:receive'));
-      }, 10000);
-
-      clientSocket.once('message:receive', (receivedMsg) => {
-        clearTimeout(timeout);
-
-        try {
-          expect(receivedMsg.text).toBe(testPayload.text);
-          expect(receivedMsg.clientMsgId).toBe(testPayload.clientMsgId);
-          expect(receivedMsg).toHaveProperty('messageId');
-          expect(receivedMsg).toHaveProperty('timestamp');
-          resolve();
-        } catch (error) {
-          reject(error);
-        }
+    try {
+      await new Promise((resolve, reject) => {
+        recipientSocket.once('connection:ack', resolve);
+        recipientSocket.once('connect_error', reject);
       });
 
+      const delivery = new Promise((resolve, reject) => {
+        const timeout = setTimeout(
+          () => reject(new Error('Timed out waiting for direct message delivery')),
+          1000
+        );
+        recipientSocket.once('message:receive', (message) => {
+          clearTimeout(timeout);
+          resolve(message);
+        });
+      });
+      const startedAt = performance.now();
       clientSocket.emit('message:send', testPayload);
-    });
+      const receivedMessage = await delivery;
+      const latencyMs = performance.now() - startedAt;
+
+      expect(latencyMs).toBeLessThan(1000);
+      expect(receivedMessage).toMatchObject({
+        text: testPayload.text,
+        clientMsgId: testPayload.clientMsgId,
+        recipientId: testPayload.recipientId,
+        senderId: 'user_tester_1',
+      });
+      expect(receivedMessage).toHaveProperty('messageId');
+      expect(receivedMessage).toHaveProperty('timestamp');
+
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      expect(senderReceivedMessage).not.toHaveBeenCalled();
+    } finally {
+      clientSocket.off('message:receive', senderReceivedMessage);
+      recipientSocket.disconnect();
+    }
   }, 15000);
 });
