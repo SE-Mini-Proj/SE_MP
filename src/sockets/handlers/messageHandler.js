@@ -1,6 +1,8 @@
 
 const messagingService = require('../../services/messagingService');
+const { isUserOnline } = require('../../cache/presenceService');
 const { publishMessage } = require('../../cache/redisPubSub');
+const { enqueueOfflineMessage } = require('../../services/offlineMessageService');
 
 function registerMessageHandler(io, socket) {
   socket.on('message:send', async (payload, callback) => {
@@ -53,6 +55,15 @@ function registerMessageHandler(io, socket) {
       if (roomId) {
         io.to(roomId).emit('message:receive', message);
       } else {
+        const recipientOnline = await isUserOnline(recipientId);
+        if (!recipientOnline) {
+          await enqueueOfflineMessage(recipientId, message);
+          if (typeof callback === 'function') {
+            callback({ status: 'queued', message });
+          }
+          return;
+        }
+
         io.to(`user:${recipientId}`).emit('message:receive', message);
       }
 

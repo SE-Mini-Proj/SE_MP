@@ -8,6 +8,29 @@ const { escapeHtml, sanitizeMessage, stripDangerousTags, sanitizeDeep } = requir
 const messagingService = require('../src/services/messagingService');
 const { generateToken } = require('../src/services/authService');
 
+jest.mock('../src/cache/presenceService', () => ({
+  registerSession: jest.fn().mockResolvedValue({
+    userId: 'user_recipient',
+    socketId: 'test-socket',
+    instanceId: 'test-instance',
+    connectedAt: new Date().toISOString(),
+    isFirstSession: true,
+  }),
+  removeSession: jest.fn().mockResolvedValue({
+    removed: true,
+    userOnline: false,
+    results: [],
+  }),
+  getUserSessions: jest.fn().mockResolvedValue([]),
+  isUserOnline: jest.fn().mockResolvedValue(true),
+  getOnlineUsers: jest.fn().mockResolvedValue([]),
+}));
+
+jest.mock('../src/services/offlineMessageService', () => ({
+  enqueueOfflineMessage: jest.fn().mockResolvedValue(undefined),
+  drainOfflineMessages: jest.fn().mockResolvedValue([]),
+}));
+
 describe('Security Requirement: XSS Sanitisation of Message Content (Issue #9 - CHAT-SR-004, TC-Sec-04)', () => {
   let server;
   let ioInstance;

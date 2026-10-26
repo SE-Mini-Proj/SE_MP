@@ -49,6 +49,9 @@ capped at 24 hours. Protected REST routes and every incoming Socket.IO event
 verify the token; invalid or expired tokens are rejected with authentication
 errors.
 
+Direct messages to offline users are kept in a per-recipient Redis queue and
+delivered in FIFO order when that user reconnects.
+
 ### Running the Application
 ```bash
 # Start development server with live reload
