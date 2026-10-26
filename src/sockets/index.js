@@ -1,5 +1,6 @@
 const { Server } = require('socket.io');
 const config = require('../config');
+const { verifyToken } = require('../services/authService');
 const registerMessageHandler = require('./handlers/messageHandler');
 const registerPresenceHandler = require('./handlers/presenceHandler');
 const {
@@ -22,29 +23,55 @@ function initializeSocket(httpServer) {
     const isEnforced = Boolean(config.tls?.enforce);
     const isSecure = Boolean(
       socket.handshake.secure ||
-      (socket.handshake.headers && socket.handshake.headers['x-forwarded-proto'] === 'https')
+      (socket.handshake.headers &&
+        socket.handshake.headers['x-forwarded-proto'] === 'https')
     );
 
     if (isEnforced && !isSecure) {
-      const err = new Error('TLS_REQUIRED: Plaintext ws:// connections are rejected. Use wss:// (TLS 1.2+).');
+      const err = new Error(
+        'TLS_REQUIRED: Plaintext ws:// connections are rejected. Use wss:// (TLS 1.2+).'
+      );
       err.data = { code: 'TLS_REQUIRED' };
       return next(err);
     }
 
-    const token =
+    const rawToken =
       socket.handshake.auth?.token ||
       socket.handshake.headers?.authorization;
 
-    const userId =
-      socket.handshake.auth?.userId ||
-      socket.handshake.query?.userId;
+    const token = typeof rawToken === 'string'
+      ? rawToken.replace(/^Bearer\s+/i, '').trim()
+      : '';
 
-    socket.user = {
-      id: userId || `user_${socket.id.substring(0, 6)}`,
-      authenticated: Boolean(token),
-    };
+    if (!token) {
+      const err = new Error('Authentication required');
+      err.data = { code: 'AUTH_REQUIRED' };
+      return next(err);
+    }
 
-    next();
+    try {
+      const decoded = verifyToken(token);
+      const authenticatedUserId = decoded.sub || decoded.id;
+
+      if (!authenticatedUserId) {
+        const err = new Error('Invalid authentication token');
+        err.data = { code: 'INVALID_TOKEN' };
+        return next(err);
+      }
+
+      socket.user = {
+        id: String(authenticatedUserId),
+        email: decoded.email,
+        username: decoded.username,
+        authenticated: true,
+      };
+
+      return next();
+    } catch {
+      const err = new Error('Invalid or expired authentication token');
+      err.data = { code: 'INVALID_TOKEN' };
+      return next(err);
+    }
   });
 
   async function handleRedisEvent(channel, event) {
@@ -92,12 +119,16 @@ function initializeSocket(httpServer) {
       );
     }
 
-    socket.emit('connection:ack', {
+    const acknowledgement = {
       status: 'connected',
       socketId: socket.id,
       user: socket.user,
       timestamp: new Date().toISOString(),
-    });
+    };
+
+    // Required by Issue #14. Keep the legacy event for existing clients.
+    socket.emit('connection-ack', acknowledgement);
+    socket.emit('connection:ack', acknowledgement);
 
     // Register message and presence handlers.
     // The presence handler automatically registers the session.
