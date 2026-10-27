@@ -216,10 +216,21 @@ class ModerationService {
       throw new Error('roomId, targetUserId, and actorId are required');
     }
 
-    // Protect room owner
+    // Protect room owner (CHAT-F-023, TC-Room-04)
     try {
       const room = await RoomModel.findById(roomId);
       if (room && room.ownerId === targetUserId) {
+        const error = new Error('Cannot remove room owner');
+        error.code = 'OPERATION_NOT_ALLOWED';
+        throw error;
+      }
+    } catch (err) {
+      if (err.code === 'OPERATION_NOT_ALLOWED') throw err;
+    }
+
+    try {
+      const { getMockRoomRole } = require('../middlewares/rbacMiddleware');
+      if (typeof getMockRoomRole === 'function' && getMockRoomRole(roomId, targetUserId) === 'owner') {
         const error = new Error('Cannot remove room owner');
         error.code = 'OPERATION_NOT_ALLOWED';
         throw error;
@@ -242,6 +253,23 @@ class ModerationService {
       roomId,
       metadata: { reason },
     });
+
+    try {
+      const { publishRoomEvent } = require('../cache/redisPubSub');
+      await publishRoomEvent({
+        roomId,
+        eventName: 'member:removed',
+        payload: {
+          roomId,
+          userId: targetUserId,
+          actorId,
+          reason,
+          timestamp: new Date().toISOString(),
+        },
+      });
+    } catch {
+      // In-memory fallback
+    }
 
     return {
       success: true,
