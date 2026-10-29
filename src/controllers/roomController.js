@@ -2,7 +2,8 @@ const roomService = require('../services/roomService');
 
 async function createRoom(req, res, next) {
   try {
-    const { name, isPrivate } = req.body;
+    const { name, isPrivate = false } = req.body;
+
     if (!name) {
       return res.status(400).json({
         code: 'VALIDATION_ERROR',
@@ -10,10 +11,15 @@ async function createRoom(req, res, next) {
       });
     }
 
-    const room = await roomService.createRoom({ name, isPrivate, ownerId: req.user?.id });
+    const room = await roomService.createRoom({
+      name,
+      isPrivate,
+      ownerId: req.user?.id,
+    });
+
     return res.status(201).json(room);
   } catch (error) {
-    next(error);
+    return next(error);
   }
 }
 
@@ -22,14 +28,38 @@ async function joinRoom(req, res, next) {
     const { roomId } = req.params;
     const { inviteCode } = req.body || {};
 
-    const result = await roomService.joinRoom({ roomId, inviteCode, userId: req.user?.id });
+    const result = await roomService.joinRoom({
+      roomId,
+      inviteCode,
+      userId: req.user?.id,
+    });
+
     return res.status(200).json(result);
   } catch (error) {
-    next(error);
+    return next(error);
+  }
+}
+
+async function createRoomInvite(req, res, next) {
+  try {
+    const { roomId } = req.params;
+    const { expiresInHours = 24 } = req.body || {};
+
+    const result = await roomService.createRoomInvite({
+      roomId,
+      userId: req.user?.id,
+      userRole: req.user?.role,
+      expiresInHours,
+    });
+
+    return res.status(201).json(result);
+  } catch (error) {
+    return next(error);
   }
 }
 
 module.exports = {
   createRoom,
   joinRoom,
+  createRoomInvite,
 };

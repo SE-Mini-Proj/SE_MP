@@ -1,5 +1,5 @@
 const express = require('express');
-const { createRoom, joinRoom } = require('../controllers/roomController');
+const { createRoom, joinRoom,createRoomInvite, } = require('../controllers/roomController');
 const moderationController = require('../controllers/moderationController');
 const { authenticateJWT } = require('../middlewares/authMiddleware');
 const { requireRoomRole, ROLES } = require('../middlewares/rbacMiddleware');
@@ -9,6 +9,10 @@ const router = express.Router();
 // Core room management routes
 router.post('/', authenticateJWT, createRoom);
 router.post('/:roomId/join', authenticateJWT, joinRoom);
+
+// Create an invitation for a private room.
+// The service verifies that the requester is authorized.
+router.post('/:roomId/invites', authenticateJWT, createRoomInvite);
 
 // Moderation & Administrative actions (CHAT-SR-005, CHAT-F-023, TC-Sec-05)
 // Restricted by RBAC: owner, admin, moderator roles
