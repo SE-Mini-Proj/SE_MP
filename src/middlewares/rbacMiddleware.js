@@ -18,6 +18,10 @@ function clearMockRoomRoles() {
   mockRoomRoles.clear();
 }
 
+function getMockRoomRole(roomId, userId) {
+  return mockRoomRoles.get(`${roomId}:${userId}`);
+}
+
 /**
  * RBAC Middleware Factory for Room Moderation & Admin Actions
  * Satisfies CHAT-SR-005, SAD §3.9 (STRIDE Elevation of Privilege), TC-Sec-05
@@ -109,4 +113,5 @@ module.exports = {
   requirePlatformAdmin,
   setMockRoomRole,
   clearMockRoomRoles,
+  getMockRoomRole,
 };

@@ -590,4 +590,202 @@ describe('WebSocket Gateway - Socket.IO Integration', () => {
     }
   }, 15000);
 
+  describe('TC-Room-03: Broadcast message to room members (CHAT-F-022)', () => {
+    let clientA;
+    let clientB;
+    let clientC;
+
+    beforeAll(async () => {
+      clientA = ioClient(`http://127.0.0.1:${serverPort}`, {
+        auth: {
+          token: generateToken({
+            id: 'user_room_a',
+            email: 'user_a@example.com',
+            username: 'user_a',
+          }).token,
+        },
+        transports: ['websocket'],
+      });
+
+      clientB = ioClient(`http://127.0.0.1:${serverPort}`, {
+        auth: {
+          token: generateToken({
+            id: 'user_room_b',
+            email: 'user_b@example.com',
+            username: 'user_b',
+          }).token,
+        },
+        transports: ['websocket'],
+      });
+
+      clientC = ioClient(`http://127.0.0.1:${serverPort}`, {
+        auth: {
+          token: generateToken({
+            id: 'user_room_c',
+            email: 'user_c@example.com',
+            username: 'user_c',
+          }).token,
+        },
+        transports: ['websocket'],
+      });
+
+      await Promise.all([
+        new Promise((res, rej) => {
+          clientA.once('connection:ack', res);
+          clientA.once('connect_error', rej);
+        }),
+        new Promise((res, rej) => {
+          clientB.once('connection:ack', res);
+          clientB.once('connect_error', rej);
+        }),
+        new Promise((res, rej) => {
+          clientC.once('connection:ack', res);
+          clientC.once('connect_error', rej);
+        }),
+      ]);
+    });
+
+    afterAll(() => {
+      if (clientA) clientA.disconnect();
+      if (clientB) clientB.disconnect();
+      if (clientC) clientC.disconnect();
+    });
+
+    it('broadcasts room message to all connected members in that room (AC-CHAT-F-022)', async () => {
+      const targetRoom = 'room_general';
+      const otherRoom = 'room_random';
+
+      await new Promise((res) => clientA.emit('room:join', { roomId: targetRoom }, res));
+      await new Promise((res) => clientB.emit('room:join', { roomId: targetRoom }, res));
+      await new Promise((res) => clientC.emit('room:join', { roomId: otherRoom }, res));
+
+      const clientCReceived = jest.fn();
+      clientC.on('message:receive', clientCReceived);
+
+      const aReceivePromise = new Promise((resolve, reject) => {
+        const timer = setTimeout(() => reject(new Error('clientA did not receive broadcast')), 2000);
+        clientA.once('message:receive', (msg) => {
+          clearTimeout(timer);
+          resolve(msg);
+        });
+      });
+
+      const bReceivePromise = new Promise((resolve, reject) => {
+        const timer = setTimeout(() => reject(new Error('clientB did not receive broadcast')), 2000);
+        clientB.once('message:receive', (msg) => {
+          clearTimeout(timer);
+          resolve(msg);
+        });
+      });
+
+      const startedAt = performance.now();
+      const sendPromise = new Promise((resolve, reject) => {
+        clientA.emit(
+          'message:send',
+          {
+            roomId: targetRoom,
+            text: 'Hello group!',
+            clientMsgId: 'client-group-1',
+          },
+          (response) => {
+            if (response && response.error) reject(new Error(response.error.message));
+            else resolve(response);
+          }
+        );
+      });
+
+      const [sendResult, msgA, msgB] = await Promise.all([
+        sendPromise,
+        aReceivePromise,
+        bReceivePromise,
+      ]);
+      const latencyMs = performance.now() - startedAt;
+
+      expect(latencyMs).toBeLessThan(1000);
+      expect(sendResult.status).toBe('ok');
+      expect(msgA).toMatchObject({
+        roomId: targetRoom,
+        senderId: 'user_room_a',
+        text: 'Hello group!',
+        clientMsgId: 'client-group-1',
+      });
+      expect(msgB).toMatchObject({
+        roomId: targetRoom,
+        senderId: 'user_room_a',
+        text: 'Hello group!',
+        clientMsgId: 'client-group-1',
+      });
+      expect(msgA).toHaveProperty('messageId');
+      expect(msgA).toHaveProperty('timestamp');
+
+      await new Promise((res) => setTimeout(res, 50));
+      expect(clientCReceived).not.toHaveBeenCalled();
+      clientC.off('message:receive', clientCReceived);
+    });
+
+    it('does not deliver broadcast to a member who left the room', async () => {
+      const targetRoom = 'room_general';
+
+      await new Promise((res) => clientB.emit('room:leave', { roomId: targetRoom }, res));
+
+      const bReceived = jest.fn();
+      clientB.on('message:receive', bReceived);
+
+      const aReceivePromise = new Promise((resolve, reject) => {
+        const timer = setTimeout(() => reject(new Error('clientA did not receive broadcast')), 2000);
+        clientA.once('message:receive', (msg) => {
+          clearTimeout(timer);
+          resolve(msg);
+        });
+      });
+
+      await new Promise((resolve, reject) => {
+        clientA.emit(
+          'message:send',
+          {
+            roomId: targetRoom,
+            text: 'Are you still there?',
+            clientMsgId: 'client-group-2',
+          },
+          (response) => {
+            if (response && response.error) reject(new Error(response.error.message));
+            else resolve(response);
+          }
+        );
+      });
+
+      const msgA = await aReceivePromise;
+      expect(msgA.text).toBe('Are you still there?');
+
+      await new Promise((res) => setTimeout(res, 50));
+      expect(bReceived).not.toHaveBeenCalled();
+      clientB.off('message:receive', bReceived);
+    });
+
+    it('sanitizes malicious markup in room messages before broadcast (CHAT-SR-004)', async () => {
+      const targetRoom = 'room_general';
+
+      await new Promise((res) => clientB.emit('room:join', { roomId: targetRoom }, res));
+
+      const bReceivePromise = new Promise((resolve, reject) => {
+        const timer = setTimeout(() => reject(new Error('clientB did not receive broadcast')), 2000);
+        clientB.once('message:receive', (msg) => {
+          clearTimeout(timer);
+          resolve(msg);
+        });
+      });
+
+      clientA.emit('message:send', {
+        roomId: targetRoom,
+        text: '<script>alert("XSS")</script><b>Safe Text</b>',
+        clientMsgId: 'client-group-xss',
+      });
+
+      const msgB = await bReceivePromise;
+      expect(msgB.text).not.toContain('<script>');
+      expect(msgB.text).toBe('&lt;script&gt;alert(&quot;XSS&quot;)&lt;&#x2F;script&gt;&lt;b&gt;Safe Text&lt;&#x2F;b&gt;');
+    });
+  });
+
+
 });

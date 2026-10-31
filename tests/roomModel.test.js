@@ -1,5 +1,4 @@
-/* global beforeEach */
-const { describe, it, expect } = require('@jest/globals');
+const { describe, it, expect, beforeEach } = require('@jest/globals');
 
 const mockClient = {
   query: jest.fn(),
