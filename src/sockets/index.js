@@ -103,6 +103,18 @@ function initializeSocket(httpServer) {
         io.to(event.roomId).emit(event.eventName, event.payload);
       }
 
+      if (event.payload.userId) {
+        io.to(`user:${event.payload.userId}`).emit(event.eventName, event.payload);
+      }
+
+      if (event.eventName === 'member:removed' && event.roomId && event.payload.userId) {
+        for (const [, sock] of io.sockets.sockets) {
+          if (sock.user?.id === event.payload.userId) {
+            sock.leave(event.roomId);
+          }
+        }
+      }
+
       return;
     }
 

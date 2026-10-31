@@ -15,6 +15,18 @@ jest.mock('../src/models/roomModel', () => ({
   getMemberRole: jest.fn(),
   createInvite: jest.fn(),
   findValidInvite: jest.fn(),
+  removeMember: jest.fn(),
+  isMember: jest.fn(),
+}));
+
+jest.mock('../src/services/auditService', () => ({
+  recordAuditLog: jest.fn().mockResolvedValue({ id: 'mock-audit-id' }),
+  getAuditLogs: jest.fn().mockResolvedValue([]),
+}));
+
+jest.mock('../src/cache/redisPubSub', () => ({
+  publishRoomEvent: jest.fn().mockResolvedValue(undefined),
+  publishMessage: jest.fn().mockResolvedValue(undefined),
 }));
 
 const UserModel = require('../src/models/userModel');
@@ -27,13 +39,12 @@ const {
   getTokenLifetimeSeconds,
   MAX_TOKEN_LIFETIME_SECONDS,
 } = require('../src/services/authService');
-
 const {
   createRoom,
   createRoomInvite,
   joinRoom,
+  removeMember,
 } = require('../src/services/roomService');
-
 const { processMessage } = require('../src/services/messagingService');
 
 describe('Auth service', () => {
@@ -382,6 +393,69 @@ describe('Room service', () => {
     });
 
     expect(RoomModel.createInvite).not.toHaveBeenCalled();
+  });
+
+  it('removes a member when requested by the room owner (CHAT-F-023, TC-Room-04)', async () => {
+    RoomModel.findById.mockResolvedValue({
+      id: 'room-1',
+      ownerId: 'owner-1',
+    });
+    RoomModel.getMemberRole.mockResolvedValue('owner');
+    RoomModel.removeMember.mockResolvedValue(true);
+
+    const result = await removeMember({
+      roomId: 'room-1',
+      targetUserId: 'member-2',
+      actorId: 'owner-1',
+      reason: 'Disruptive behavior',
+    });
+
+    expect(result.status).toBe('ok');
+    expect(result.removed).toBe(true);
+    expect(result.userId).toBe('member-2');
+    expect(RoomModel.removeMember).toHaveBeenCalledWith({
+      roomId: 'room-1',
+      userId: 'member-2',
+    });
+  });
+
+  it('prohibits non-owners from removing room members (AC-CHAT-F-023)', async () => {
+    RoomModel.findById.mockResolvedValue({
+      id: 'room-1',
+      ownerId: 'owner-1',
+    });
+    RoomModel.getMemberRole.mockResolvedValue('member');
+
+    await expect(
+      removeMember({
+        roomId: 'room-1',
+        targetUserId: 'member-3',
+        actorId: 'member-2',
+      })
+    ).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+      status: 403,
+    });
+    expect(RoomModel.removeMember).not.toHaveBeenCalled();
+  });
+
+  it('prevents removing the room owner', async () => {
+    RoomModel.findById.mockResolvedValue({
+      id: 'room-1',
+      ownerId: 'owner-1',
+    });
+    RoomModel.getMemberRole.mockResolvedValue('owner');
+
+    await expect(
+      removeMember({
+        roomId: 'room-1',
+        targetUserId: 'owner-1',
+        actorId: 'owner-1',
+      })
+    ).rejects.toMatchObject({
+      code: 'OPERATION_NOT_ALLOWED',
+      status: 403,
+    });
   });
 });
 
