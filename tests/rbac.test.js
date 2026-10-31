@@ -190,7 +190,7 @@ describe('Security Requirement: RBAC & Audit Logging for Moderation Actions (Iss
       expect(deleteLog.targetType).toBe('message');
     });
 
-    it('should allow room owner to remove a member (CHAT-F-023)', async () => {
+    it('should allow room owner to remove a member (CHAT-F-023, TC-Room-04)', async () => {
       const res = await request(app)
         .delete(`/api/rooms/${roomId}/members/${targetMemberId}`)
         .set('Authorization', `Bearer ${validToken(ownerId)}`)
@@ -205,6 +205,26 @@ describe('Security Requirement: RBAC & Audit Logging for Moderation Actions (Iss
       expect(removeLog).toBeDefined();
       expect(removeLog.actorId).toBe(ownerId);
       expect(removeLog.targetType).toBe('member');
+    });
+
+    it('should prohibit room moderators from removing members (CHAT-F-023, TC-Room-04)', async () => {
+      const res = await request(app)
+        .delete(`/api/rooms/${roomId}/members/${targetMemberId}`)
+        .set('Authorization', `Bearer ${validToken(moderatorId)}`)
+        .send({ reason: 'Moderator trying to evict' });
+
+      expect(res.status).toBe(403);
+      expect(res.body).toHaveProperty('code', 'FORBIDDEN');
+    });
+
+    it('should reject attempts to remove the room owner (CHAT-F-023, TC-Room-04)', async () => {
+      const res = await request(app)
+        .delete(`/api/rooms/${roomId}/members/${ownerId}`)
+        .set('Authorization', `Bearer ${validToken(ownerId)}`)
+        .send({ reason: 'Self-removal' });
+
+      expect(res.status).toBe(403);
+      expect(res.body).toHaveProperty('code', 'OPERATION_NOT_ALLOWED');
     });
 
     it('should allow platform admin to bypass room role and execute actions', async () => {
