@@ -1,3 +1,4 @@
+/* global beforeEach */
 const { describe, it, expect } = require('@jest/globals');
 
 const mockClient = {

@@ -1,3 +1,4 @@
+/* global setTimeout, clearTimeout */
 const {
   registerSession,
   removeSession,
@@ -9,10 +10,56 @@ const {
   publishRoomEvent,
   publishMessage,
 } = require('../../cache/redisPubSub');
-const { drainOfflineMessages } = require('../../services/offlineMessageService');
+
+const {
+  drainOfflineMessages,
+} = require('../../services/offlineMessageService');
+
+const TYPING_TIMEOUT_MS = 3000;
 
 function registerPresenceHandler(io, socket) {
   const userId = socket.user?.id || socket.id;
+  const typingTimers = new Map();
+
+  function publishTypingEvent(roomId, isTyping) {
+    const payload = {
+      userId,
+      isTyping,
+      roomId,
+    };
+
+    socket.to(roomId).emit('typing:update', payload);
+
+    Promise.resolve(
+      publishRoomEvent({
+        roomId,
+        eventName: 'typing:update',
+        payload,
+      })
+    ).catch((error) => {
+      console.error(
+        '[Presence] Failed to publish typing event:',
+        error.message
+      );
+    });
+  }
+
+  function stopTyping(roomId) {
+    if (!roomId) {
+      return;
+    }
+
+    const timer = typingTimers.get(roomId);
+
+    if (!timer) {
+      return;
+    }
+
+    clearTimeout(timer);
+    typingTimers.delete(roomId);
+
+    publishTypingEvent(roomId, false);
+  }
 
   registerSession({
     userId,
@@ -22,8 +69,10 @@ function registerPresenceHandler(io, socket) {
     .then(async (session) => {
       try {
         const queuedMessages = await drainOfflineMessages(userId);
+
         for (const message of queuedMessages) {
           io.to(`user:${userId}`).emit('message:receive', message);
+
           try {
             await publishMessage(message);
           } catch (error) {
@@ -51,7 +100,10 @@ function registerPresenceHandler(io, socket) {
       }
     })
     .catch((error) => {
-      console.error('[Presence] Failed to register session:', error.message);
+      console.error(
+        '[Presence] Failed to register session:',
+        error.message
+      );
     });
 
   socket.on('room:join', async ({ roomId } = {}, callback) => {
@@ -64,6 +116,7 @@ function registerPresenceHandler(io, socket) {
           },
         });
       }
+
       return;
     }
 
@@ -84,7 +137,10 @@ function registerPresenceHandler(io, socket) {
         payload,
       });
     } catch (error) {
-      console.error('[Presence] Failed to publish room join:', error.message);
+      console.error(
+        '[Presence] Failed to publish room join:',
+        error.message
+      );
     }
 
     if (typeof callback === 'function') {
@@ -102,8 +158,12 @@ function registerPresenceHandler(io, socket) {
           },
         });
       }
+
       return;
     }
+
+    // Notify other room members before leaving.
+    stopTyping(roomId);
 
     socket.leave(roomId);
 
@@ -122,7 +182,10 @@ function registerPresenceHandler(io, socket) {
         payload,
       });
     } catch (error) {
-      console.error('[Presence] Failed to publish room leave:', error.message);
+      console.error(
+        '[Presence] Failed to publish room leave:',
+        error.message
+      );
     }
 
     if (typeof callback === 'function') {
@@ -131,44 +194,33 @@ function registerPresenceHandler(io, socket) {
   });
 
   socket.on('typing:start', ({ roomId } = {}) => {
-    const payload = {
-      userId,
-      isTyping: true,
-      roomId,
-    };
-
-    const target = roomId ? socket.to(roomId) : socket.broadcast;
-    target.emit('typing:update', payload);
-
-    if (roomId) {
-      publishRoomEvent({
-        roomId,
-        eventName: 'typing:update',
-        payload,
-      }).catch((error) => {
-        console.error('[Presence] Failed to publish typing event:', error.message);
-      });
+    // Typing updates are allowed only in a room this socket has joined.
+    if (!roomId || !socket.rooms.has(roomId)) {
+      return;
     }
+
+    const previousTimer = typingTimers.get(roomId);
+
+    if (previousTimer) {
+      clearTimeout(previousTimer);
+    }
+
+    publishTypingEvent(roomId, true);
+
+    const timer = setTimeout(() => {
+      stopTyping(roomId);
+    }, TYPING_TIMEOUT_MS);
+
+    typingTimers.set(roomId, timer);
   });
 
   socket.on('typing:stop', ({ roomId } = {}) => {
-    const payload = {
-      userId,
-      isTyping: false,
-      roomId,
-    };
+    stopTyping(roomId);
+  });
 
-    const target = roomId ? socket.to(roomId) : socket.broadcast;
-    target.emit('typing:update', payload);
-
-    if (roomId) {
-      publishRoomEvent({
-        roomId,
-        eventName: 'typing:update',
-        payload,
-      }).catch((error) => {
-        console.error('[Presence] Failed to publish typing event:', error.message);
-      });
+  socket.on('disconnecting', () => {
+    for (const roomId of [...typingTimers.keys()]) {
+      stopTyping(roomId);
     }
   });
 
@@ -190,9 +242,14 @@ function registerPresenceHandler(io, socket) {
         });
       }
     } catch (error) {
-      console.error('[Presence] Failed to clean up session:', error.message);
+      console.error(
+        '[Presence] Failed to clean up session:',
+        error.message
+      );
     }
   });
+
+  return stopTyping;
 }
 
 module.exports = registerPresenceHandler;

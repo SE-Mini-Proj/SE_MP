@@ -6,6 +6,7 @@ const ioClient = require('socket.io-client');
 const app = require('../src/app');
 const { initializeSocket } = require('../src/sockets');
 const { generateToken } = require('../src/services/authService');
+const messagingService = require('../src/services/messagingService');
 
 jest.mock('../src/cache/redisPubSub', () => ({
   INSTANCE_ID: 'test-instance',
@@ -355,4 +356,238 @@ describe('WebSocket Gateway - Socket.IO Integration', () => {
       recipientSocket.disconnect();
     }
   }, 15000);
+
+  const connectTypingObserver = async () => {
+    const observer = ioClient(`http://127.0.0.1:${serverPort}`, {
+      auth: {
+        token: generateToken({
+          id: 'typing_observer',
+          email: 'typing-observer@example.com',
+          username: 'typing_observer',
+        }).token,
+      },
+      transports: ['websocket'],
+    });
+
+    await new Promise((resolve, reject) => {
+      observer.once('connection:ack', resolve);
+      observer.once('connect_error', reject);
+    });
+
+    return observer;
+  };
+
+  const joinTypingRoom = async (socket, roomId) => {
+    socket.emit('room:join', { roomId });
+    await new Promise((resolve) => setTimeout(resolve, 150));
+  };
+
+  it('broadcasts typing indicators and stops them explicitly', async () => {
+    const roomId = 'typing-explicit-stop-room';
+    const observer = await connectTypingObserver();
+
+    try {
+      await joinTypingRoom(clientSocket, roomId);
+      await joinTypingRoom(observer, roomId);
+
+      const started = new Promise((resolve, reject) => {
+        const timeout = setTimeout(
+          () => reject(new Error('Timed out waiting for typing:start')),
+          5000
+        );
+        observer.once('typing:update', (event) => {
+          clearTimeout(timeout);
+          resolve(event);
+        });
+      });
+
+      clientSocket.emit('typing:start', { roomId });
+
+      const startEvent = await started;
+      expect(startEvent).toMatchObject({
+        roomId,
+        userId: 'user_tester_1',
+        isTyping: true,
+      });
+
+      const stopped = new Promise((resolve, reject) => {
+        const timeout = setTimeout(
+          () => reject(new Error('Timed out waiting for typing:stop')),
+          5000
+        );
+        observer.once('typing:update', (event) => {
+          clearTimeout(timeout);
+          resolve(event);
+        });
+      });
+
+      clientSocket.emit('typing:stop', { roomId });
+
+      const stopEvent = await stopped;
+      expect(stopEvent).toMatchObject({
+        roomId,
+        userId: 'user_tester_1',
+        isTyping: false,
+      });
+    } finally {
+      observer.disconnect();
+    }
+  }, 15000);
+
+  it('automatically stops the typing indicator after inactivity', async () => {
+    const roomId = 'typing-inactivity-room';
+    const observer = await connectTypingObserver();
+
+    try {
+      await joinTypingRoom(clientSocket, roomId);
+      await joinTypingRoom(observer, roomId);
+
+      const events = [];
+      const stopped = new Promise((resolve, reject) => {
+        const timeout = setTimeout(
+          () => reject(new Error('Typing indicator did not stop automatically')),
+          6000
+        );
+
+        observer.on('typing:update', (event) => {
+          events.push(event);
+
+          if (event.isTyping === false) {
+            clearTimeout(timeout);
+            resolve(event);
+          }
+        });
+      });
+
+      clientSocket.emit('typing:start', { roomId });
+
+      const stopEvent = await stopped;
+
+      expect(events.some((event) => event.isTyping === true)).toBe(true);
+      expect(stopEvent).toMatchObject({
+        roomId,
+        userId: 'user_tester_1',
+        isTyping: false,
+      });
+    } finally {
+      observer.disconnect();
+    }
+  }, 10000);
+
+  it('stops the typing indicator when the user leaves the room', async () => {
+    const roomId = 'typing-leave-room';
+    const observer = await connectTypingObserver();
+
+    try {
+      await joinTypingRoom(clientSocket, roomId);
+      await joinTypingRoom(observer, roomId);
+
+      const started = new Promise((resolve, reject) => {
+        const timeout = setTimeout(
+          () => reject(new Error('Timed out waiting for typing:start')),
+          5000
+        );
+        observer.once('typing:update', (event) => {
+          clearTimeout(timeout);
+          resolve(event);
+        });
+      });
+
+      clientSocket.emit('typing:start', { roomId });
+      await started;
+
+      const stopped = new Promise((resolve, reject) => {
+        const timeout = setTimeout(
+          () => reject(new Error('Timed out waiting for typing:stop on room leave')),
+          5000
+        );
+        observer.once('typing:update', (event) => {
+          clearTimeout(timeout);
+          resolve(event);
+        });
+      });
+
+      clientSocket.emit('room:leave', { roomId });
+
+      const stopEvent = await stopped;
+      expect(stopEvent).toMatchObject({
+        roomId,
+        userId: 'user_tester_1',
+        isTyping: false,
+      });
+    } finally {
+      observer.disconnect();
+    }
+  }, 15000);
+
+  it('stops the typing indicator when the user sends a room message', async () => {
+    const roomId = 'typing-send-message-room';
+    const observer = await connectTypingObserver();
+    const processMessageSpy = jest
+      .spyOn(messagingService, 'processMessage')
+      .mockResolvedValue({
+        messageId: 'typing-test-message',
+        roomId,
+        senderId: 'user_tester_1',
+        text: 'Hello from typing test',
+        timestamp: new Date().toISOString(),
+      });
+
+    try {
+      await joinTypingRoom(clientSocket, roomId);
+      await joinTypingRoom(observer, roomId);
+
+      const started = new Promise((resolve, reject) => {
+        const timeout = setTimeout(
+          () => reject(new Error('Timed out waiting for typing:start')),
+          5000
+        );
+        observer.once('typing:update', (event) => {
+          clearTimeout(timeout);
+          resolve(event);
+        });
+      });
+
+      clientSocket.emit('typing:start', { roomId });
+      await started;
+
+      const stopped = new Promise((resolve, reject) => {
+        const timeout = setTimeout(
+          () => reject(new Error('Timed out waiting for typing:stop after message')),
+          5000
+        );
+        observer.once('typing:update', (event) => {
+          clearTimeout(timeout);
+          resolve(event);
+        });
+      });
+
+      clientSocket.emit(
+        'message:send',
+        {
+          roomId,
+          text: 'Hello from typing test',
+          clientMsgId: 'typing-test-client-message',
+        },
+        (response) => {
+          if (response && response.error) {
+            // The typing-stop event is still checked below.
+          }
+        }
+      );
+
+      const stopEvent = await stopped;
+      expect(stopEvent).toMatchObject({
+        roomId,
+        userId: 'user_tester_1',
+        isTyping: false,
+      });
+
+      expect(processMessageSpy).toHaveBeenCalled();
+    } finally {
+      processMessageSpy.mockRestore();
+      observer.disconnect();
+    }
+  }, 15000);
+
 });

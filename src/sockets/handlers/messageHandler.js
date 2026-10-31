@@ -4,7 +4,7 @@ const { isUserOnline } = require('../../cache/presenceService');
 const { publishMessage } = require('../../cache/redisPubSub');
 const { enqueueOfflineMessage } = require('../../services/offlineMessageService');
 
-function registerMessageHandler(io, socket) {
+function registerMessageHandler(io, socket,stopTyping = () => {}) {
   socket.on('message:send', async (payload, callback) => {
     try {
       const { roomId, recipientId, text, clientMsgId } = payload || {};
@@ -51,7 +51,10 @@ function registerMessageHandler(io, socket) {
         senderId: socket.user?.id || socket.id,
         clientMsgId,
       });
-
+      // Stop the typing indicator once the message has been processed.
+         if (roomId) {
+         stopTyping(roomId);
+      }
       if (roomId) {
         io.to(roomId).emit('message:receive', message);
       } else {
