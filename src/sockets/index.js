@@ -162,11 +162,10 @@ function initializeSocket(httpServer) {
     socket.emit('connection-ack', acknowledgement);
     socket.emit('connection:ack', acknowledgement);
 
-    // Register message and presence handlers.
-    // The presence handler automatically registers the session.
-    registerMessageHandler(io, socket);
-    registerPresenceHandler(io, socket);
-  });
+    // Register presence first so the message handler can stop typing.
+    const stopTyping = registerPresenceHandler(io, socket);
+    registerMessageHandler(io, socket, stopTyping);
+    });
 
   return {
     io,
