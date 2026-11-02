@@ -184,17 +184,25 @@
               Powered by a normalized relational database engine (PostgreSQL CHAT-F-040), event-driven WebSocket gateway, horizontal Redis Pub/Sub cluster, and RBAC security controls.
             </p>
             <div class="portal-hero-actions">
-              <button class="portal-btn-primary" onclick="document.getElementById('composerInput').focus();">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
-                <span>Send Message</span>
+              <button class="portal-btn-dbms" onclick="window.hyperChat.openDbmsModal();" title="Test PostgreSQL Message Persistence (CHAT-F-040)">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><ellipse cx="12" cy="5" rx="9" ry="3"></ellipse><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"></path><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path></svg>
+                <span>Test DBMS Queries</span>
               </button>
-              <button class="portal-btn-secondary" onclick="window.hyperChat.openCreateRoomModal();">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="16"></line><line x1="8" y1="12" x2="16" y2="12"></line></svg>
+              <button class="portal-btn-xss" onclick="window.hyperChat.quickTestXss();" title="Test XSS Defense (CHAT-SR-004)">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+                <span>Test XSS Defense</span>
+              </button>
+              <button class="portal-btn-rbac" onclick="window.hyperChat.cyclePersona();" title="Cycle Persona & RBAC Roles (CHAT-SR-005)">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+                <span>Switch Role (RBAC)</span>
+              </button>
+              <button class="portal-btn-create" onclick="window.hyperChat.openCreateRoomModal();" title="Create New Channel">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="16"></line><line x1="8" y1="12" x2="16" y2="12"></line></svg>
                 <span>Create Channel</span>
               </button>
-              <button class="portal-btn-tertiary" onclick="window.hyperChat.openDbmsModal();">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><ellipse cx="12" cy="5" rx="9" ry="3"></ellipse><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"></path><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path></svg>
-                <span>Test DBMS Queries</span>
+              <button class="portal-btn-audit" onclick="window.hyperChat.setDrawerTab('audit'); window.hyperChat.toggleDrawer();" title="View Moderation Audit Logs">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
+                <span>Audit Logs</span>
               </button>
             </div>
           </div>

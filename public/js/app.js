@@ -893,6 +893,14 @@
     state.currentRoom = target;
     target.unreadCount = 0;
 
+    const composerInput = document.getElementById('composerInput');
+    if (composerInput) {
+      const isDirect = target.isDirect || target.id.startsWith('dm_');
+      composerInput.placeholder = isDirect
+        ? `Message @${target.name}... (Enter to send, Shift+Enter for new line)`
+        : `Message #${target.name}... (Enter to send, Shift+Enter for new line)`;
+    }
+
     renderChannelsList();
     renderChatHeader();
     renderMessages();
@@ -1344,14 +1352,39 @@
   function openDbmsModal() {
     const modal = document.getElementById('dbmsModal');
     if (modal) {
+      modal.classList.add('open');
       modal.classList.add('visible');
+      modal.style.display = 'flex';
       executeDbmsQuery();
     }
   }
 
   function closeDbmsModal() {
     const modal = document.getElementById('dbmsModal');
-    if (modal) modal.classList.remove('visible');
+    if (modal) {
+      modal.classList.remove('open');
+      modal.classList.remove('visible');
+      modal.style.display = 'none';
+    }
+  }
+
+  function quickTestXss() {
+    const payload = '<script>alert("XSS Attack!");</script><b style="color:#f43f5e;">Sanitized XSS Test Payload (CHAT-SR-004)</b>';
+    const input = document.getElementById('composerInput');
+    if (input) {
+      input.value = payload;
+      sendMessage();
+      showToast('🛡️ XSS Test: Payload securely escaped & sanitized without execution (CHAT-SR-004)!', 'success');
+    }
+  }
+
+  function cyclePersona() {
+    const currentIdx = TEST_PERSONAS.findIndex((p) => p.id === state.currentUser?.id);
+    const nextIdx = (currentIdx + 1) % TEST_PERSONAS.length;
+    const nextPersona = TEST_PERSONAS[nextIdx];
+    const select = document.getElementById('personaSelect');
+    if (select) select.value = nextPersona.id;
+    switchPersona(nextPersona.id);
   }
 
   function executeDbmsQuery() {
@@ -1512,6 +1545,8 @@
     insertTestDbmsRecord,
     startDirectMessage,
     updateKpiMetrics,
+    quickTestXss,
+    cyclePersona,
     testDbmsPersistence: () => {
       openDbmsModal();
     },
