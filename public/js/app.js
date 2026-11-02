@@ -626,13 +626,6 @@
     const roomId = state.currentRoom.id;
     const msgs = state.messages[roomId] || [];
 
-    const feedPill = document.getElementById('feedCurrentRoomPill');
-    if (feedPill) {
-      feedPill.textContent = (state.currentRoom.isDirect || state.currentRoom.id.startsWith('dm_'))
-        ? '@ ' + state.currentRoom.name
-        : '# ' + state.currentRoom.name;
-    }
-
     container.innerHTML = '';
 
     if (msgs.length === 0) {
@@ -676,23 +669,11 @@
       // Check permissions: Owner/Moderator can delete messages (CHAT-SR-005, TC-Sec-05)
       const canDelete = state.currentUser?.role === 'owner' || state.currentUser?.role === 'moderator' || isOwn;
 
-      const isDirect = state.currentRoom.isDirect || state.currentRoom.id.startsWith('dm_');
-      const categoryTag = isDirect ? 'DIRECT MESSAGE' : `ROOM #${escapeHtml(state.currentRoom.name || state.currentRoom.id)}`;
-      const categoryClass = isDirect ? 'direct' : '';
-
       row.innerHTML = `
-        <div class="message-card-header">
-          <span class="message-category-pill ${categoryClass}">${categoryTag}</span>
-          <span class="message-dbms-badge" title="CHAT-F-040: Synchronously Persisted in PostgreSQL messages table">
-            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
-            PostgreSQL Persisted
-          </span>
+        <div class="message-avatar" style="background:${getAvatarColor(msg.senderId)};">
+          ${initial}
         </div>
-        <div style="display:flex; gap:12px; align-items:flex-start;">
-          <div class="message-avatar" style="background:${getAvatarColor(msg.senderId)};">
-            ${initial}
-          </div>
-          <div class="message-content">
+        <div class="message-content">
           <div class="message-meta">
             <span class="message-author ${isOwn ? 'is-own' : ''}">${escapeHtml(msg.senderName)}</span>
             <span class="role-tag ${role}" style="font-size:0.6rem;">${role}</span>
@@ -700,7 +681,6 @@
           </div>
           <div class="message-body">${renderMessageBody(msg.text)}</div>
           ${renderReactionsHtml(msg.reactions)}
-        </div>
         </div>
         <div class="message-actions">
           <button class="msg-act-btn" title="React with 👍" onclick="window.hyperChat.toggleReaction('${msg.id}', '👍')">👍</button>
@@ -896,8 +876,6 @@
     renderChannelsList();
     renderChatHeader();
     renderMessages();
-    renderConfidenceChannels();
-    updateKpiMetrics();
     scrollToBottom();
 
     if (state.activeDrawerTab === 'audit') {
@@ -940,7 +918,6 @@
     };
     state.messages[roomId].push(localMsg);
     renderMessages();
-    updateKpiMetrics();
     scrollToBottom();
 
     // Emit via WebSocket (CHAT-F-011, CHAT-F-022)
@@ -1175,9 +1152,6 @@
     renderPersonaCard();
     renderMembersList();
     renderMessages();
-    renderCampusPeers();
-    renderConfidenceChannels();
-    updateKpiMetrics();
 
     // Reconnect socket with new token/credentials
     initializeSocketConnection();
@@ -1224,218 +1198,6 @@
     }
   }
 
-  // --- PORTAL METRICS & HIGH-CONFIDENCE CHANNELS (Image 2 Parity) ---
-
-  function updateKpiMetrics() {
-    const actChannelsEl = document.getElementById('statActiveChannels');
-    if (actChannelsEl) actChannelsEl.textContent = state.rooms.length;
-
-    const connUsersEl = document.getElementById('statConnectedUsers');
-    if (connUsersEl) connUsersEl.textContent = state.members.length;
-
-    const peersCountEl = document.getElementById('activeUsersCountBadge');
-    if (peersCountEl) {
-      const onlineCount = state.members.filter((m) => m.status === 'online').length;
-      peersCountEl.textContent = `${onlineCount} Online`;
-    }
-
-    const totalMsgsEl = document.getElementById('statTotalMessages');
-    if (totalMsgsEl) {
-      let count = 0;
-      for (const rId of Object.keys(state.messages)) {
-        count += (state.messages[rId] || []).length;
-      }
-      totalMsgsEl.textContent = `${count + 32}+`;
-    }
-  }
-
-  function renderConfidenceChannels() {
-    const container = document.getElementById('confidenceChannelsList');
-    if (!container) return;
-    container.innerHTML = '';
-
-    const scoreMap = [98, 94.2, 91.5, 88.4, 85.0];
-
-    state.rooms.forEach((room, idx) => {
-      const score = idx < scoreMap.length ? scoreMap[idx] : (80 - idx * 2);
-      const isAmber = score < 92;
-      const isActive = state.currentRoom && state.currentRoom.id === room.id;
-
-      const item = document.createElement('div');
-      item.className = `confidence-item ${isActive ? 'active' : ''}`;
-      item.onclick = () => switchRoom(room.id);
-
-      item.innerHTML = `
-        <div class="confidence-info">
-          <span class="confidence-name">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="4" y1="9" x2="20" y2="9"></line><line x1="4" y1="15" x2="20" y2="15"></line><line x1="10" y1="3" x2="8" y2="21"></line><line x1="16" y1="3" x2="14" y2="21"></line></svg>
-            #${escapeHtml(room.name)}
-          </span>
-          <span class="confidence-sub">${escapeHtml(room.topic || 'Channel updates')}</span>
-        </div>
-        <span class="confidence-score ${isAmber ? 'amber' : ''}">${score}%</span>
-      `;
-      container.appendChild(item);
-    });
-  }
-
-  function renderCampusPeers() {
-    const container = document.getElementById('campusPeersList');
-    if (!container) return;
-    container.innerHTML = '';
-
-    state.members.forEach((member) => {
-      const item = document.createElement('div');
-      item.className = 'peer-item';
-      const initial = (member.name || 'U').substring(0, 2).toUpperCase();
-      const color = getAvatarColor(member.id);
-
-      item.innerHTML = `
-        <div class="peer-info">
-          <div class="peer-avatar" style="background:${color};">
-            ${initial}
-          </div>
-          <div class="peer-details">
-            <span class="peer-name">
-              ${escapeHtml(member.name)}
-              <span class="peer-status-dot ${member.status === 'idle' ? 'idle' : ''}"></span>
-            </span>
-            <span class="role-tag ${member.role}" style="font-size:0.58rem; align-self:flex-start;">${member.role}</span>
-          </div>
-        </div>
-        <button class="peer-dm-btn" title="Send direct message" onclick="window.hyperChat.startDirectMessage('${member.id}', '${escapeHtml(member.name)}')">DM</button>
-      `;
-      container.appendChild(item);
-    });
-  }
-
-  function startDirectMessage(userId, userName) {
-    const dmRoomId = `dm_${userId}`;
-    let existingRoom = state.rooms.find((r) => r.id === dmRoomId);
-    if (!existingRoom) {
-      existingRoom = {
-        id: dmRoomId,
-        name: userName,
-        isPrivate: true,
-        isDirect: true,
-        topic: `Direct encrypted message channel with ${userName}`,
-      };
-      state.rooms.push(existingRoom);
-    }
-    if (!state.messages[dmRoomId]) {
-      state.messages[dmRoomId] = [
-        {
-          id: `dm_welcome_${Date.now()}`,
-          senderId: 'system',
-          senderName: 'System Bot',
-          role: 'admin',
-          text: `Direct message channel opened with ${userName}. Messages persist synchronously to PostgreSQL (CHAT-F-040).`,
-          timestamp: new Date().toISOString(),
-          isSystem: true,
-        },
-      ];
-    }
-    switchRoom(dmRoomId);
-    renderChannelsList();
-    renderConfidenceChannels();
-    showToast(`Direct message channel opened with ${userName}`, 'info');
-  }
-
-  function openDbmsModal() {
-    const modal = document.getElementById('dbmsModal');
-    if (modal) {
-      modal.classList.add('visible');
-      executeDbmsQuery();
-    }
-  }
-
-  function closeDbmsModal() {
-    const modal = document.getElementById('dbmsModal');
-    if (modal) modal.classList.remove('visible');
-  }
-
-  function executeDbmsQuery() {
-    const tableBody = document.getElementById('dbmsTableBody');
-    const countEl = document.getElementById('dbmsResultsCount');
-    const latencyEl = document.getElementById('modalLatencyBadge');
-    const globalLatencyEl = document.getElementById('dbmsLatencyVal');
-
-    const randomLatency = (0.95 + Math.random() * 0.45).toFixed(2);
-    if (latencyEl) latencyEl.textContent = `Latency: ${randomLatency} ms`;
-    if (globalLatencyEl) globalLatencyEl.textContent = `${randomLatency} ms`;
-
-    if (!tableBody) return;
-    tableBody.innerHTML = '';
-
-    const allMsgs = [];
-    for (const [roomId, msgs] of Object.entries(state.messages)) {
-      msgs.forEach((m) => {
-        if (!m.isSystem) {
-          allMsgs.push({
-            id: m.id.startsWith('msg_') ? `550e8400-e29b-41d4-a716-${m.id.slice(-8).padStart(12, '0')}` : m.id,
-            room: roomId,
-            sender: m.senderName || 'Anonymous',
-            content: m.text,
-            delivered: true,
-            createdAt: m.timestamp || new Date().toISOString(),
-          });
-        }
-      });
-    }
-
-    allMsgs.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-    const previewList = allMsgs.slice(0, 8);
-
-    if (countEl) countEl.textContent = previewList.length;
-
-    previewList.forEach((row) => {
-      const tr = document.createElement('tr');
-      const shortId = row.id.length > 20 ? row.id.substring(0, 18) + '...' : row.id;
-      const shortContent = row.content.length > 36 ? row.content.substring(0, 34) + '...' : row.content;
-      const timeStr = new Date(row.createdAt).toLocaleTimeString();
-
-      tr.innerHTML = `
-        <td style="font-family:var(--font-mono); color:#a5b4fc;">${escapeHtml(shortId)}</td>
-        <td><code>#${escapeHtml(row.room)}</code></td>
-        <td style="font-weight:600;">${escapeHtml(row.sender)}</td>
-        <td style="color:#e2e8f0;">${escapeHtml(shortContent)}</td>
-        <td><span class="badge-status-green" style="font-size:0.65rem; padding:1px 6px;">● true</span></td>
-        <td style="color:var(--text-muted); font-size:0.7rem;">${timeStr}</td>
-      `;
-      tableBody.appendChild(tr);
-    });
-  }
-
-  function insertTestDbmsRecord() {
-    const testId = `msg_dbms_${Date.now().toString().slice(-6)}`;
-    const newMsg = {
-      id: testId,
-      senderId: state.currentUser ? state.currentUser.id : 'user_owner_uuid',
-      senderName: state.currentUser ? state.currentUser.username : 'Alice (Owner)',
-      role: state.currentUser ? state.currentUser.role : 'owner',
-      text: `[DBMS Verification] Message persisted into PostgreSQL table messages at ${new Date().toLocaleTimeString()} (CHAT-F-040).`,
-      timestamp: new Date().toISOString(),
-      delivered: true,
-    };
-
-    const roomId = state.currentRoom ? state.currentRoom.id : 'general';
-    if (!state.messages[roomId]) state.messages[roomId] = [];
-    state.messages[roomId].push(newMsg);
-
-    if (state.socket && state.socket.connected) {
-      state.socket.emit('message:send', {
-        roomId,
-        text: newMsg.text,
-        clientMsgId: testId,
-      });
-    }
-
-    renderMessages();
-    updateKpiMetrics();
-    executeDbmsQuery();
-    showToast('[PostgreSQL] Persisted test record into messages table!', 'success');
-  }
-
   // --- INITIALIZATION ---
 
   function init() {
@@ -1465,9 +1227,6 @@
     renderChatHeader();
     renderMessages();
     renderMembersList();
-    renderConfidenceChannels();
-    renderCampusPeers();
-    updateKpiMetrics();
 
     // 4. Initialize WebSocket
     initializeSocketConnection();
@@ -1506,42 +1265,6 @@
 
   // Export public API to window for HTML event bindings
   window.hyperChat = {
-    openDbmsModal,
-    closeDbmsModal,
-    executeDbmsQuery,
-    insertTestDbmsRecord,
-    startDirectMessage,
-    updateKpiMetrics,
-    testDbmsPersistence: () => {
-      openDbmsModal();
-    },
-    testDbmsPersistenceSocket: () => {
-      showToast('Testing PostgreSQL DBMS Message Persistence (CHAT-F-040)...', 'info');
-      if (socket && socket.connected) {
-        socket.emit(
-          'message:send',
-          {
-            roomId: state.currentRoom.id,
-            text: `[DBMS Verification] Message verified and persisted in PostgreSQL database at ${new Date().toLocaleTimeString()} (CHAT-F-040).`,
-            clientMsgId: `dbms_verify_${Date.now()}`,
-          },
-          (res) => {
-            if (res && res.status === 'ok') {
-              showToast(`[DBMS Success] Persisted in PostgreSQL! (ID: ${res.message.messageId.substring(0, 16)}...)`, 'success');
-              const el = document.getElementById('statTotalMessages');
-              if (el) {
-                const count = parseInt(el.textContent, 10) || 36;
-                el.textContent = `${count + 1}+`;
-              }
-            } else {
-              showToast('DBMS notice: Message processed.', 'info');
-            }
-          }
-        );
-      } else {
-        showToast('WebSocket connected. Verifying persistence...', 'info');
-      }
-    },
     init,
     sendMessage,
     insertXssPayload,

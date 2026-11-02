@@ -167,244 +167,55 @@
         </div>
       </header>
 
-      <!-- Portal Scroll Area (PES University Dashboard Aesthetic) -->
-      <div class="portal-scroll-area" id="portalScrollArea">
-        <!-- Portal Hero Banner (PES University / Enterprise Real-Time Chat Portal) -->
-        <section class="portal-hero-banner" id="portalHeroBanner">
-          <div class="portal-hero-content">
-            <div class="portal-pill-tag">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
-              </svg>
-              <span>PES University Real-Time Chat Portal</span>
-              <span class="portal-pill-sub">Chat App</span>
-            </div>
-            <h2 class="portal-hero-title">Connecting Students &amp; Teams in Real Time</h2>
-            <p class="portal-hero-subtitle">
-              Powered by a normalized relational database engine (PostgreSQL CHAT-F-040), event-driven WebSocket gateway, horizontal Redis Pub/Sub cluster, and RBAC security controls.
-            </p>
-            <div class="portal-hero-actions">
-              <button class="portal-btn-primary" onclick="document.getElementById('composerInput').focus();">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
-                <span>Send Message</span>
+      <!-- Message History Stream / Feed -->
+      <section class="messages-container" id="messagesContainer" aria-label="Message Feed" role="log">
+        <!-- Messages rendered dynamically -->
+      </section>
+
+      <!-- Real-Time Typing Notice Banner (CHAT-F-031) -->
+      <div class="typing-banner" id="typingBanner" aria-live="polite">
+        <!-- Animated typing indicator -->
+      </div>
+
+      <!-- Chat Composer (Input, XSS tester, Send) -->
+      <div class="composer-wrapper">
+        <div class="composer-container">
+          <div class="composer-input-row">
+            <textarea
+              id="composerInput"
+              class="composer-input"
+              rows="1"
+              placeholder="Message #general... (Enter to send, Shift+Enter for new line)"
+              autocomplete="off"
+              aria-label="Type message"
+            ></textarea>
+          </div>
+          <div class="composer-toolbar">
+            <div class="toolbar-left">
+              <button class="tool-btn xss-btn" id="xssTestBtn" title="Insert harmless script tag to demonstrate XSS sanitization (CHAT-SR-004)">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+                </svg>
+                Test XSS Payload
               </button>
-              <button class="portal-btn-secondary" onclick="window.hyperChat.openCreateRoomModal();">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="16"></line><line x1="8" y1="12" x2="16" y2="12"></line></svg>
-                <span>Create Channel</span>
+              <button class="tool-btn" title="Add code formatting" onclick="document.getElementById('composerInput').value += '```\n// code snippet\n```'; document.getElementById('composerInput').focus();">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <polyline points="16 18 22 12 16 6"></polyline>
+                  <polyline points="8 6 2 12 8 18"></polyline>
+                </svg>
+                Code
               </button>
-              <button class="portal-btn-tertiary" onclick="window.hyperChat.openDbmsModal();">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><ellipse cx="12" cy="5" rx="9" ry="3"></ellipse><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"></path><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path></svg>
-                <span>Test DBMS Queries</span>
-              </button>
             </div>
-          </div>
-          <div class="portal-hero-graphic" aria-hidden="true">
-            <div class="shield-badge-container">
-              <svg width="68" height="68" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" class="shield-svg">
-                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
-                <polyline points="9 12 11 14 15 10"></polyline>
-              </svg>
-            </div>
-          </div>
-        </section>
-
-        <!-- 6 Metrics / KPI Cards -->
-        <section class="portal-metrics-grid" id="portalMetricsGrid" aria-label="Portal System Statistics">
-          <div class="metric-card">
-            <div class="metric-card-header">
-              <span class="metric-label">ACTIVE CHANNELS</span>
-              <span class="metric-icon pink">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"></circle><path d="M12 16v-4"></path><path d="M12 8h.01"></path></svg>
-              </span>
-            </div>
-            <div class="metric-value" id="statActiveChannels">4</div>
-          </div>
-
-          <div class="metric-card">
-            <div class="metric-card-header">
-              <span class="metric-label">ONLINE USERS</span>
-              <span class="metric-icon green">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
-              </span>
-            </div>
-            <div class="metric-value" id="statConnectedUsers">5</div>
-          </div>
-
-          <div class="metric-card">
-            <div class="metric-card-header">
-              <span class="metric-label">TOTAL MESSAGES</span>
-              <span class="metric-icon purple">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="22 12 16 12 14 15 10 15 8 12 2 12"></polyline><path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"></path></svg>
-              </span>
-            </div>
-            <div class="metric-value" id="statTotalMessages">36+</div>
-          </div>
-
-          <div class="metric-card">
-            <div class="metric-card-header">
-              <span class="metric-label">PERSISTENCE</span>
-              <span class="metric-icon orange">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
-              </span>
-            </div>
-            <div class="metric-value text-small" id="statPersistenceStatus">PostgreSQL</div>
-          </div>
-
-          <div class="metric-card">
-            <div class="metric-card-header">
-              <span class="metric-label">DELIVERY RATE</span>
-              <span class="metric-icon cyan">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>
-              </span>
-            </div>
-            <div class="metric-value" id="statDeliveryRate">100%</div>
-          </div>
-
-          <div class="metric-card">
-            <div class="metric-card-header">
-              <span class="metric-label">SECURITY PROTOCOL</span>
-              <span class="metric-icon violet">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
-              </span>
-            </div>
-            <div class="metric-value text-small" id="statSecurityProtocol">TLS 1.2+</div>
-          </div>
-        </section>
-
-        <!-- Two-Column Portal Layout (Recently Reported Messages on Left, Channels & Presence on Right) -->
-        <div class="portal-main-grid">
-          <!-- Left Column: Feed & Composer -->
-          <div class="portal-feed-col">
-            <div class="portal-section-header">
-              <div class="portal-section-title-wrap">
-                <div class="portal-section-title">
-                  <span class="live-dot-pulse"></span>
-                  <span>Recently Reported Messages</span>
-                </div>
-                <div class="portal-section-sub">Live feed from academic blocks, library, and campus hotspots</div>
-              </div>
-              <div class="portal-section-actions">
-                <span class="current-room-pill" id="feedCurrentRoomPill"># general</span>
-                <button class="portal-link-btn" onclick="window.hyperChat.setDrawerTab('audit'); window.hyperChat.toggleDrawer();">View All Logs &gt;</button>
-              </div>
-            </div>
-
-            <!-- Message History Stream / Feed -->
-            <section class="messages-container" id="messagesContainer" aria-label="Message Feed" role="log">
-              <!-- Messages rendered dynamically -->
-            </section>
-
-            <!-- Real-Time Typing Notice Banner (CHAT-F-031) -->
-            <div class="typing-banner" id="typingBanner" aria-live="polite">
-              <!-- Animated typing indicator -->
-            </div>
-
-            <!-- Chat Composer (Input, XSS tester, Send) -->
-            <div class="composer-wrapper">
-              <div class="composer-container">
-                <div class="composer-input-row">
-                  <textarea
-                    id="composerInput"
-                    class="composer-input"
-                    rows="1"
-                    placeholder="Message #general... (Enter to send, Shift+Enter for new line)"
-                    autocomplete="off"
-                    aria-label="Type message"
-                  ></textarea>
-                </div>
-                <div class="composer-toolbar">
-                  <div class="toolbar-left">
-                    <button class="tool-btn xss-btn" id="xssTestBtn" title="Insert harmless script tag to demonstrate XSS sanitization (CHAT-SR-004)">
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
-                      </svg>
-                      Test XSS Payload
-                    </button>
-                    <button class="tool-btn" title="Add code formatting" onclick="document.getElementById('composerInput').value += '```\n// code snippet\n```'; document.getElementById('composerInput').focus();">
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <polyline points="16 18 22 12 16 6"></polyline>
-                        <polyline points="8 6 2 12 8 18"></polyline>
-                      </svg>
-                      Code
-                    </button>
-                  </div>
-                  <div class="toolbar-right">
-                    <button class="send-btn" id="sendBtn" title="Send message">
-                      <span>Send</span>
-                      <span class="send-kbd-hint">⏎</span>
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Right Column: High-Confidence Channels, Presence & DBMS Status -->
-          <div class="portal-side-col">
-            <!-- High-Confidence Channels Card -->
-            <div class="portal-widget-card">
-              <div class="widget-header">
-                <div class="widget-title">
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2.5"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
-                  <span>High-Confidence Channels</span>
-                </div>
-                <button class="widget-explore-btn" onclick="window.hyperChat.openCreateRoomModal();">Explore +</button>
-              </div>
-              <div class="confidence-list" id="confidenceChannelsList">
-                <!-- Dynamically populated -->
-              </div>
-            </div>
-
-            <!-- Campus Active Peers Card -->
-            <div class="portal-widget-card">
-              <div class="widget-header">
-                <div class="widget-title">
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2.5"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
-                  <span>Active Campus Peers</span>
-                </div>
-                <span class="widget-badge-count" id="activeUsersCountBadge">5 Online</span>
-              </div>
-              <div class="campus-peers-list" id="campusPeersList">
-                <!-- Dynamically populated -->
-              </div>
-            </div>
-
-            <!-- PostgreSQL DBMS Persistence Health Widget -->
-            <div class="portal-widget-card dbms-widget">
-              <div class="widget-header">
-                <div class="widget-title">
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#06b6d4" stroke-width="2.5"><ellipse cx="12" cy="5" rx="9" ry="3"></ellipse><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"></path><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path></svg>
-                  <span>PostgreSQL Relational Engine</span>
-                </div>
-                <span class="dbms-live-pill">CONNECTED</span>
-              </div>
-              <div class="dbms-info-grid">
-                <div class="dbms-info-row">
-                  <span class="dbms-info-lbl">DBMS Table:</span>
-                  <span class="dbms-info-val"><code>messages</code> (UUID)</span>
-                </div>
-                <div class="dbms-info-row">
-                  <span class="dbms-info-lbl">Persistence:</span>
-                  <span class="dbms-info-val highlight-green">CHAT-F-040 Verified</span>
-                </div>
-                <div class="dbms-info-row">
-                  <span class="dbms-info-lbl">Write Mode:</span>
-                  <span class="dbms-info-val">Synchronous ACID</span>
-                </div>
-                <div class="dbms-info-row">
-                  <span class="dbms-info-lbl">Query Latency:</span>
-                  <span class="dbms-info-val highlight-green" id="dbmsLatencyVal">1.18 ms</span>
-                </div>
-              </div>
-              <button class="dbms-test-btn" onclick="window.hyperChat.openDbmsModal();">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="4 17 10 11 4 5"></polyline><line x1="12" y1="19" x2="20" y2="19"></line></svg>
-                Launch DBMS Query Inspector
+            <div class="toolbar-right">
+              <button class="send-btn" id="sendBtn" title="Send message">
+                <span>Send</span>
+                <span class="send-kbd-hint">⏎</span>
               </button>
             </div>
           </div>
         </div>
       </div>
-</main>
+    </main>
 
     <!-- ======================================================================
          RIGHT SLIDE-OVER DRAWER: Members, Moderation Actions, Audit Logs
@@ -588,82 +399,6 @@
       <div class="modal-footer">
         <button class="btn-secondary" onclick="window.hyperChat.closeCreateRoomModal()">Cancel</button>
         <button class="btn-primary" onclick="window.hyperChat.confirmCreateRoom()">Create Channel</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- 4. PostgreSQL DBMS Persistence Inspector Modal (CHAT-F-040) -->
-  <div class="modal-backdrop" id="dbmsModal">
-    <div class="modal-dialog modal-large">
-      <div class="modal-header">
-        <div class="modal-header-with-icon">
-          <div class="modal-icon-badge">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2.5">
-              <ellipse cx="12" cy="5" rx="9" ry="3"></ellipse>
-              <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"></path>
-              <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path>
-            </svg>
-          </div>
-          <div>
-            <h3 class="modal-title">PostgreSQL DBMS Query Inspector</h3>
-            <span class="modal-subtitle">Relational message persistence verification (CHAT-F-040, AC-CHAT-F-040)</span>
-          </div>
-        </div>
-        <button class="icon-btn-subtle" onclick="window.hyperChat.closeDbmsModal()">✕</button>
-      </div>
-      <div class="modal-body">
-        <div class="sql-query-box">
-          <div class="sql-query-header">
-            <span class="sql-label">SQL QUERY CONSOLE</span>
-            <div class="sql-badges">
-              <span class="sql-badge-tag">ENGINE: POSTGRESQL 16</span>
-              <span class="sql-badge-tag">ISOLATION: READ COMMITTED</span>
-              <span class="sql-latency-badge" id="modalLatencyBadge">Latency: 1.18 ms</span>
-            </div>
-          </div>
-          <pre class="sql-code"><code>SELECT id, room_id, sender_id, content, delivered, created_at 
-FROM messages 
-ORDER BY created_at DESC 
-LIMIT 10;</code></pre>
-          <div class="sql-actions">
-            <button class="btn-primary btn-sm" onclick="window.hyperChat.executeDbmsQuery()">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
-              Execute Query
-            </button>
-            <button class="btn-secondary btn-sm" onclick="window.hyperChat.insertTestDbmsRecord()">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-              Insert Test Record (INSERT INTO messages...)
-            </button>
-          </div>
-        </div>
-
-        <div class="dbms-results-wrap">
-          <div class="dbms-results-header">
-            <span class="results-title">QUERY RESULTS (<span id="dbmsResultsCount">3</span> ROWS)</span>
-            <span class="dbms-status-pill">● 100% PERSISTED IN POSTGRESQL</span>
-          </div>
-          <div class="dbms-table-responsive">
-            <table class="dbms-table" id="dbmsResultsTable">
-              <thead>
-                <tr>
-                  <th>Message ID (UUID)</th>
-                  <th>Room</th>
-                  <th>Sender</th>
-                  <th>Content Preview</th>
-                  <th>Delivered</th>
-                  <th>Timestamp</th>
-                </tr>
-              </thead>
-              <tbody id="dbmsTableBody">
-                <!-- Dynamically populated -->
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-      <div class="modal-footer">
-        <span class="dbms-footer-note">AC-CHAT-F-040: All messages persist to PostgreSQL table messages before socket broadcast acknowledgment.</span>
-        <button class="btn-secondary" onclick="window.hyperChat.closeDbmsModal()">Close</button>
       </div>
     </div>
   </div>
