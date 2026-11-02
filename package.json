@@ -6,7 +6,7 @@
   "scripts": {
     "start": "node src/server.js",
     "dev": "nodemon src/server.js",
-    "test": "jest --runInBand",
+    "test": "jest --runInBand --forceExit",
     "test:watch": "jest --watch",
     "test:unit": "jest tests/services.test.js --runInBand",
     "test:integration": "jest tests/db.test.js tests/health.test.js tests/socket.test.js --runInBand",

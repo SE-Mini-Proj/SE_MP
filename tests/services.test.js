@@ -29,7 +29,7 @@ jest.mock('../src/models/messageModel', () => {
   };
 });
 
-const { describe, it, expect, beforeEach } = require('@jest/globals');
+const { describe, it, expect, beforeEach, afterAll } = require('@jest/globals');
 
 jest.mock('../src/models/userModel', () => ({
   findByEmail: jest.fn(),
@@ -549,5 +549,14 @@ describe('Messaging service', () => {
     const msg = await getMessageById('mock-msg-uuid-1');
     expect(MessageModel.findById).toHaveBeenCalledWith('mock-msg-uuid-1');
     expect(msg.content).toBe('Mocked message');
+  });
+
+  afterAll(async () => {
+    try {
+      const { closePool } = require('../src/db/pool');
+      await closePool();
+    } catch {
+      // ignore
+    }
   });
 });

@@ -91,6 +91,13 @@ describe('WebSocket Gateway - Socket.IO Integration', () => {
         });
       });
     }
+
+    try {
+      const { closePool } = require('../src/db/pool');
+      await closePool();
+    } catch {
+      // Ignore if pool not initialized
+    }
   });
 
   it('should connect with a valid JWT and receive connection-ack', async () => {

@@ -1,4 +1,4 @@
-const { describe, it, expect, beforeEach } = require('@jest/globals');
+const { describe, it, expect, beforeEach, afterAll } = require('@jest/globals');
 
 // Mock database pool
 jest.mock('../src/db', () => ({
@@ -14,6 +14,15 @@ describe('Functional Requirement: Message Persistence to PostgreSQL Database (Is
   beforeEach(() => {
     jest.clearAllMocks();
     messagingService.clearInMemoryMessages();
+  });
+
+  afterAll(async () => {
+    try {
+      const { closePool } = require('../src/db/pool');
+      await closePool();
+    } catch {
+      // ignore
+    }
   });
 
   describe('TC-Hist-01.1: MessageModel Repository Operations', () => {
@@ -250,3 +259,4 @@ describe('Functional Requirement: Message Persistence to PostgreSQL Database (Is
     });
   });
 });
+
