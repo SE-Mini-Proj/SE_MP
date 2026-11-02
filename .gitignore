@@ -37,3 +37,4 @@ __pycache__/
 *.pyc
 create_github_issues.py
 _temp_body.md
+create_jira_issues.py

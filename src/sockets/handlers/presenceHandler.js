@@ -14,6 +14,7 @@ const {
 const {
   drainOfflineMessages,
 } = require('../../services/offlineMessageService');
+const messagingService = require('../../services/messagingService');
 
 const TYPING_TIMEOUT_MS = 3000;
 
@@ -72,6 +73,9 @@ function registerPresenceHandler(io, socket) {
 
         for (const message of queuedMessages) {
           io.to(`user:${userId}`).emit('message:receive', message);
+          if (message.messageId || message.id) {
+            await messagingService.markMessageDelivered(message.messageId || message.id);
+          }
 
           try {
             await publishMessage(message);

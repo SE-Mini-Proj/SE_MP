@@ -788,4 +788,66 @@ describe('WebSocket Gateway - Socket.IO Integration', () => {
   });
 
 
+
+  describe('TC-Hist-01: Message persistence to PostgreSQL database (CHAT-F-040)', () => {
+    it('persists sent message with sender, timestamp, and content before acknowledgment (AC-CHAT-F-040)', async () => {
+      const targetRoom = 'room_persist_test';
+      await new Promise((res) => clientSocket.emit('room:join', { roomId: targetRoom }, res));
+
+      const ackResponse = await new Promise((resolve, reject) => {
+        clientSocket.emit(
+          'message:send',
+          {
+            roomId: targetRoom,
+            text: 'Durable message for persistence test',
+            clientMsgId: 'client-msg-hist-1',
+          },
+          (res) => {
+            if (res && res.error) reject(new Error(res.error.message));
+            else resolve(res);
+          }
+        );
+      });
+
+      expect(ackResponse.status).toBe('ok');
+      expect(ackResponse.message).toBeDefined();
+      expect(ackResponse.message.text).toBe('Durable message for persistence test');
+      expect(ackResponse.message.senderId).toBe('user_tester_1');
+      expect(ackResponse.message.roomId).toBe(targetRoom);
+      expect(ackResponse.message.messageId).toBeTruthy();
+      expect(ackResponse.message.timestamp).toBeTruthy();
+      expect(ackResponse.message.delivered).toBe(true);
+
+      const persisted = await messagingService.getMessageById(ackResponse.message.messageId);
+      expect(persisted).not.toBeNull();
+      expect(persisted.content).toBe('Durable message for persistence test');
+    });
+
+    it('persists direct message for offline recipient with delivered=false before queueing (AC-CHAT-F-040)', async () => {
+      isUserOnline.mockResolvedValueOnce(false);
+
+      const ackResponse = await new Promise((resolve, reject) => {
+        clientSocket.emit(
+          'message:send',
+          {
+            recipientId: 'offline_recipient_test',
+            text: 'Durable direct message for offline recipient',
+            clientMsgId: 'client-msg-hist-offline',
+          },
+          (res) => {
+            if (res && res.error) reject(new Error(res.error.message));
+            else resolve(res);
+          }
+        );
+      });
+
+      expect(ackResponse.status).toBe('queued');
+      expect(ackResponse.message.messageId).toBeTruthy();
+      expect(ackResponse.message.delivered).toBe(false);
+
+      const persisted = await messagingService.getMessageById(ackResponse.message.messageId);
+      expect(persisted).not.toBeNull();
+      expect(persisted.delivered).toBe(false);
+    });
+  });
 });

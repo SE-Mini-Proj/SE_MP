@@ -3,7 +3,7 @@ const { sanitizeMessage } = require('../utils/sanitizer');
 
 /**
  * Message Model & Database Repository
- * Supports paginated history retrieval for direct and room messaging (Issue #2 & SAD §3.4)
+ * Supports durable persistence and paginated history retrieval for direct and room messaging (CHAT-F-040 & SAD §3.4)
  */
 class MessageModel {
   constructor({ id, room_id, sender_id, recipient_id, content, created_at, delivered = false }) {
@@ -89,6 +89,18 @@ class MessageModel {
     const res = await db.query(queryText, [messageId]);
     if (res.rows.length === 0) return null;
     return new MessageModel(res.rows[0]);
+  }
+
+  toJSON() {
+    return {
+      id: this.id,
+      roomId: this.roomId,
+      senderId: this.senderId,
+      recipientId: this.recipientId,
+      content: this.content,
+      delivered: this.delivered,
+      createdAt: this.createdAt instanceof Date ? this.createdAt.toISOString() : this.createdAt,
+    };
   }
 }
 

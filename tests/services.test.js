@@ -1,3 +1,34 @@
+jest.mock('../src/models/messageModel', () => {
+  return class MockMessageModel {
+    constructor(data) {
+      this.id = data.id || 'mock-msg-uuid';
+      this.roomId = data.room_id || data.roomId || null;
+      this.senderId = data.sender_id || data.senderId;
+      this.recipientId = data.recipient_id || data.recipientId || null;
+      this.content = data.content;
+      this.delivered = Boolean(data.delivered);
+      this.createdAt = data.created_at || data.createdAt || new Date('2026-11-02T12:00:00Z');
+    }
+    static create = jest.fn(async ({ roomId, senderId, recipientId, content, delivered }) => {
+      return new MockMessageModel({
+        id: 'mock-msg-uuid-1',
+        room_id: roomId,
+        sender_id: senderId,
+        recipient_id: recipientId,
+        content,
+        delivered,
+        created_at: new Date('2026-11-02T12:00:00Z'),
+      });
+    });
+    static markDelivered = jest.fn(async (id) => {
+      return new MockMessageModel({ id, delivered: true });
+    });
+    static findById = jest.fn(async (id) => {
+      return new MockMessageModel({ id, content: 'Mocked message' });
+    });
+  };
+});
+
 const { describe, it, expect, beforeEach } = require('@jest/globals');
 
 jest.mock('../src/models/userModel', () => ({
@@ -45,7 +76,8 @@ const {
   joinRoom,
   removeMember,
 } = require('../src/services/roomService');
-const { processMessage } = require('../src/services/messagingService');
+const { processMessage, markMessageDelivered, getMessageById } = require('../src/services/messagingService');
+const MessageModel = require('../src/models/messageModel');
 
 describe('Auth service', () => {
   beforeEach(() => {
@@ -488,5 +520,34 @@ describe('Messaging service', () => {
       status: 400,
       message: 'Message text cannot be empty',
     });
+  });
+
+  it('persists sent room messages to PostgreSQL database (CHAT-F-040, AC-CHAT-F-040)', async () => {
+    const result = await processMessage({
+      roomId: 'room-1',
+      senderId: 'user-1',
+      text: 'Persisted room message',
+    });
+
+    expect(MessageModel.create).toHaveBeenCalledWith({
+      roomId: 'room-1',
+      senderId: 'user-1',
+      recipientId: null,
+      content: 'Persisted room message',
+      delivered: false,
+    });
+    expect(result.messageId).toBe('mock-msg-uuid-1');
+  });
+
+  it('marks delivered messages in PostgreSQL database (CHAT-F-040)', async () => {
+    const delivered = await markMessageDelivered('mock-msg-uuid-1');
+    expect(MessageModel.markDelivered).toHaveBeenCalledWith('mock-msg-uuid-1');
+    expect(delivered.delivered).toBe(true);
+  });
+
+  it('retrieves persisted message by ID (CHAT-F-040)', async () => {
+    const msg = await getMessageById('mock-msg-uuid-1');
+    expect(MessageModel.findById).toHaveBeenCalledWith('mock-msg-uuid-1');
+    expect(msg.content).toBe('Mocked message');
   });
 });
