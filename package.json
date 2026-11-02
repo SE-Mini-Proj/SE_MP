@@ -5,6 +5,7 @@
   "main": "src/server.js",
   "scripts": {
     "start": "node src/server.js",
+    "start:frontend": "node start-frontend.js",
     "dev": "nodemon src/server.js",
     "test": "jest --runInBand --forceExit",
     "test:watch": "jest --watch",
