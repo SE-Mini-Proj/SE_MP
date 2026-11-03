@@ -16,6 +16,8 @@ export default [
       sourceType: 'commonjs',
       globals: {
         node: 'readonly',
+        Buffer: 'readonly',
+        URL: 'readonly',
         process: 'readonly',
         console: 'readonly',
         __dirname: 'readonly',
@@ -36,6 +38,7 @@ export default [
       sourceType: 'commonjs',
       globals: {
         node: 'readonly',
+        Buffer: 'readonly',
         process: 'readonly',
         console: 'readonly',
         require: 'readonly',
@@ -43,6 +46,14 @@ export default [
         exports: 'writable',
         __dirname: 'readonly',
         jest: 'readonly',
+        describe: 'readonly',
+        it: 'readonly',
+        test: 'readonly',
+        expect: 'readonly',
+        beforeEach: 'readonly',
+        afterEach: 'readonly',
+        beforeAll: 'readonly',
+        afterAll: 'readonly',
       },
     },
     rules: {
