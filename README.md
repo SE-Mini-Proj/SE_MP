@@ -52,6 +52,20 @@ errors.
 Direct messages to offline users are kept in a per-recipient Redis queue and
 delivered in FIFO order when that user reconnects.
 
+### Push notifications
+To send FCM push notifications for direct messages, set
+`FCM_SERVICE_ACCOUNT_JSON` (the service-account JSON contents) or
+`FCM_SERVICE_ACCOUNT_FILE` (an absolute path to the service-account JSON file).
+The service account must have Firebase Cloud Messaging permission. Set
+`FCM_PROJECT_ID` only when it should override the account's `project_id`.
+Authenticated clients register and remove their FCM registration token using
+`POST /api/notifications/devices` and `DELETE /api/notifications/devices`,
+respectively, with `{ "deviceToken": "..." }` as the JSON body. Run
+`npm run db:migrate` to create the token table. The push provider is attempted
+for direct messages (including offline recipients); provider failures are
+logged without preventing realtime or queued message delivery. Clients should
+only display a foreground notification when appropriate to avoid duplicates.
+
 Authenticated users can create named chat rooms with `POST /api/rooms`.
 Room creation and adding the creator as the room owner/member are committed
 atomically in PostgreSQL.
