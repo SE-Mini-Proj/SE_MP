@@ -136,6 +136,26 @@
     }
   }
 
+  function renderMediaAttachmentHtml(media) {
+    return `
+      <div class="message-file">
+        <span class="message-file-icon" aria-hidden="true">📎</span>
+        <span class="message-file-name">${escapeHtml(media.fileName)}</span>
+        <span class="message-file-size">${formatFileSize(media.size)}</span>
+        <button class="msg-act-btn" type="button" title="Download ${escapeHtml(media.fileName)}"
+          onclick="window.hyperChat.downloadMedia('${escapeHtml(media.id)}')">Download</button>
+      </div>
+    `;
+  }
+
+  function formatFileSize(size) {
+    const bytes = Number(size);
+    if (!Number.isFinite(bytes) || bytes < 0) return '';
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  }
+
   // --- TOAST NOTIFICATIONS ---
   function showToast(message, type = 'info') {
     const container = document.getElementById('toast-container');
@@ -438,6 +458,8 @@
       }
     });
 
+    socket.on('media:shared', appendMediaMessage);
+
     // Real-Time Typing Indicator (CHAT-F-031)
     socket.on('typing:update', ({ userId, isTyping, roomId }) => {
       if (roomId && roomId !== state.currentRoom.id) return;
@@ -680,6 +702,7 @@
             <span class="message-time">${timeStr}</span>
           </div>
           <div class="message-body">${renderMessageBody(msg.text)}</div>
+          ${msg.media ? renderMediaAttachmentHtml(msg.media) : ''}
           ${renderReactionsHtml(msg.reactions)}
         </div>
         <div class="message-actions">
@@ -880,6 +903,118 @@
 
     if (state.activeDrawerTab === 'audit') {
       loadAuditLogs();
+    }
+    loadRoomMedia(target.id);
+  }
+
+  function appendMediaMessage(media) {
+    const roomId = media.roomId;
+    if (!roomId) return;
+    if (!state.messages[roomId]) state.messages[roomId] = [];
+    if (state.messages[roomId].some((message) => message.id === media.id)) return;
+
+    state.messages[roomId].push({
+      id: media.id,
+      senderId: media.uploaderId,
+      senderName: media.uploaderName || getSenderDisplayName(media.uploaderId),
+      role: getSenderRole(media.uploaderId),
+      text: '',
+      timestamp: media.createdAt,
+      roomId,
+      media,
+    });
+
+    if (roomId === state.currentRoom.id) {
+      renderMessages();
+      scrollToBottom();
+    } else {
+      incrementUnreadBadge(roomId);
+    }
+  }
+
+  async function loadRoomMedia(roomId) {
+    if (!state.currentUser?.token || !/^[0-9a-f-]{36}$/i.test(roomId)) return;
+
+    try {
+      const response = await fetch(`/api/media/rooms/${encodeURIComponent(roomId)}`, {
+        headers: { Authorization: `****** },
+      });
+      const data = await response.json().catch(() => null);
+      if (!response.ok) {
+        throw new Error(data?.message || `HTTP error ${response.status}`);
+      }
+
+      (data.media || []).forEach(appendMediaMessage);
+    } catch (error) {
+      console.warn(`[Media] Could not load room files: ${error.message}`);
+    }
+  }
+
+  async function uploadMediaFile(file) {
+    const user = state.currentUser;
+    const roomId = state.currentRoom.id;
+    if (!user?.token) {
+      showToast('Sign in before sharing a file.', 'error');
+      return;
+    }
+
+    const attachButton = document.getElementById('attachFileBtn');
+    if (attachButton) attachButton.disabled = true;
+
+    try {
+      const response = await fetch(`/api/media/rooms/${encodeURIComponent(roomId)}`, {
+        method: 'POST',
+        headers: {
+          Authorization: `******,
+          'Content-Type': file.type || 'application/octet-stream',
+          'X-File-Name': encodeURIComponent(file.name),
+        },
+        body: file,
+      });
+      const data = await response.json().catch(() => null);
+      if (!response.ok) {
+        throw new Error(data?.message || `HTTP error ${response.status}`);
+      }
+
+      appendMediaMessage(data.media);
+      showToast('File shared with the conversation.', 'success');
+    } catch (error) {
+      showToast(`File upload failed: ${error.message}`, 'error');
+    } finally {
+      if (attachButton) attachButton.disabled = false;
+    }
+  }
+
+  async function downloadMedia(mediaId) {
+    const user = state.currentUser;
+    if (!user?.token) {
+      showToast('Sign in before downloading a file.', 'error');
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/media/${encodeURIComponent(mediaId)}/download`, {
+        headers: { Authorization: `****** },
+      });
+      if (!response.ok) {
+        const data = await response.json().catch(() => null);
+        throw new Error(data?.message || `HTTP error ${response.status}`);
+      }
+
+      const blob = await response.blob();
+      const media = Object.values(state.messages)
+        .flat()
+        .find((message) => message.media?.id === mediaId)?.media;
+      const downloadUrl = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = downloadUrl;
+      link.download = media?.fileName || 'shared-file';
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.setTimeout(() => URL.revokeObjectURL(downloadUrl), 1000);
+    } catch (error) {
+      showToast(`File download failed: ${error.message}`, 'error');
     }
   }
 
@@ -1259,6 +1394,19 @@
     const xssBtn = document.getElementById('xssTestBtn');
     if (xssBtn) xssBtn.addEventListener('click', insertXssPayload);
 
+    const attachFileBtn = document.getElementById('attachFileBtn');
+    const mediaFileInput = document.getElementById('mediaFileInput');
+    if (attachFileBtn && mediaFileInput) {
+      attachFileBtn.addEventListener('click', () => mediaFileInput.click());
+      mediaFileInput.addEventListener('change', () => {
+        const [file] = mediaFileInput.files || [];
+        mediaFileInput.value = '';
+        if (file) uploadMediaFile(file);
+      });
+    }
+
+    loadRoomMedia(state.currentRoom.id);
+
     // Initial audit logs pre-fetch
     loadAuditLogs();
   }
@@ -1286,6 +1434,7 @@
     toggleDrawer,
     toggleSidebar,
     loadAuditLogs,
+    downloadMedia,
   };
 
   // Launch on DOM ready
