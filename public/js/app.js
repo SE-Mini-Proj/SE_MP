@@ -402,7 +402,9 @@
       showToast('WebSocket connected securely', 'success');
 
       // Join active room on connect
-      socket.emit('room:join', { roomId: state.currentRoom.id });
+      if (!state.currentRoom.isDirect) {
+        socket.emit('room:join', { roomId: state.currentRoom.id });
+      }
     });
 
     socket.on('connect_error', (err) => {
@@ -427,15 +429,16 @@
 
     // Real-Time Message Received (CHAT-F-011, CHAT-F-022, CHAT-SR-004)
     socket.on('message:receive', (msg) => {
-      const targetRoom = msg.roomId || state.currentRoom.id;
-      if (!state.messages[targetRoom]) {
-        state.messages[targetRoom] = [];
+      const conversationId = msg.roomId
+        || `dm:${msg.senderId === state.currentUser?.id ? msg.recipientId : msg.senderId}`;
+      if (!state.messages[conversationId]) {
+        state.messages[conversationId] = [];
       }
 
       // Check if message is already added (optimistic send prevention)
-      const existing = state.messages[targetRoom].find((m) => m.id === msg.messageId || (msg.clientMsgId && m.clientMsgId === msg.clientMsgId));
+      const existing = state.messages[conversationId].find((m) => m.id === msg.messageId || (msg.clientMsgId && m.clientMsgId === msg.clientMsgId));
       if (!existing) {
-        state.messages[targetRoom].push({
+        state.messages[conversationId].push({
           id: msg.messageId || 'msg_' + Date.now(),
           clientMsgId: msg.clientMsgId,
           senderId: msg.senderId,
@@ -443,17 +446,18 @@
           role: getSenderRole(msg.senderId),
           text: msg.text,
           timestamp: msg.timestamp || new Date().toISOString(),
-          roomId: targetRoom,
+          roomId: msg.roomId || null,
+          recipientId: msg.recipientId || null,
         });
 
         playNotificationChime();
 
-        if (targetRoom === state.currentRoom.id) {
+        if (isConversationFocused(conversationId)) {
           renderMessages();
           scrollToBottom();
         } else {
           // Increment unread badge for non-active channel (CHAT-F-060)
-          incrementUnreadBadge(targetRoom);
+          incrementUnreadBadge(conversationId);
         }
       }
     });
@@ -610,18 +614,18 @@
       if (member.id === state.currentUser?.id) return;
 
       const item = document.createElement('div');
-      item.className = 'contact-item';
-      item.onclick = () => {
-        showToast(`Started direct message with ${member.name}`, 'info');
-      };
+      item.className = `contact-item ${state.currentRoom.directUserId === member.id ? 'active' : ''}`;
+      item.onclick = () => switchContact(member.id);
 
       const initial = member.name.substring(0, 1).toUpperCase();
+      const unreadCount = member.unreadCount || 0;
 
       item.innerHTML = `
         <div class="contact-info">
           <span class="presence-dot ${member.status === 'online' ? 'online' : 'idle'}"></span>
           <span>${escapeHtml(member.name)}</span>
         </div>
+        ${unreadCount > 0 ? `<span class="badge-unread">${unreadCount}</span>` : ''}
         <span class="role-tag ${member.role}" style="font-size:0.6rem;">${member.role}</span>
       `;
 
@@ -633,11 +637,28 @@
     const titleEl = document.getElementById('chatRoomName');
     const topicEl = document.getElementById('chatRoomTopic');
     if (titleEl) {
-      const lockIcon = state.currentRoom.isPrivate ? '🔒 ' : '# ';
-      titleEl.innerHTML = `${lockIcon}${escapeHtml(state.currentRoom.name)}`;
+      const prefix = state.currentRoom.isDirect
+        ? '↗ '
+        : state.currentRoom.isPrivate ? '🔒 ' : '# ';
+      titleEl.innerHTML = `${prefix}${escapeHtml(state.currentRoom.name)}`;
     }
     if (topicEl) {
-      topicEl.textContent = state.currentRoom.topic || 'Real-time discussion channel';
+      topicEl.textContent = state.currentRoom.isDirect
+        ? 'Direct message'
+        : state.currentRoom.topic || 'Real-time discussion channel';
+    }
+    const composer = document.getElementById('composerInput');
+    if (composer) {
+      composer.placeholder = state.currentRoom.isDirect
+        ? `Message ${state.currentRoom.name}...`
+        : `Message #${state.currentRoom.name}... (Enter to send, Shift+Enter for new line)`;
+    }
+    const attachButton = document.getElementById('attachFileBtn');
+    if (attachButton) {
+      attachButton.disabled = Boolean(state.currentRoom.isDirect);
+      attachButton.title = state.currentRoom.isDirect
+        ? 'File sharing is available in rooms'
+        : 'Share an image or document';
     }
   }
 
@@ -654,8 +675,8 @@
       container.innerHTML = `
         <div style="text-align:center; padding:3rem 1rem; color:var(--text-muted);">
           <div style="font-size:2rem; margin-bottom:8px;">💬</div>
-          <h4 style="color:var(--text-primary); margin-bottom:4px;">Welcome to #${escapeHtml(state.currentRoom.name)}</h4>
-          <p style="font-size:0.85rem;">This is the start of the #${escapeHtml(state.currentRoom.name)} channel.</p>
+          <h4 style="color:var(--text-primary); margin-bottom:4px;">${state.currentRoom.isDirect ? `Conversation with ${escapeHtml(state.currentRoom.name)}` : `Welcome to #${escapeHtml(state.currentRoom.name)}`}</h4>
+          <p style="font-size:0.85rem;">${state.currentRoom.isDirect ? 'This is the start of your direct conversation.' : `This is the start of the #${escapeHtml(state.currentRoom.name)} channel.`}</p>
         </div>
       `;
       return;
@@ -881,7 +902,44 @@
     if (room) {
       room.unreadCount = (room.unreadCount || 0) + 1;
       renderChannelsList();
+      return;
     }
+
+    const directUserId = roomId.startsWith('dm:') ? roomId.slice(3) : '';
+    const member = state.members.find((user) => user.id === directUserId);
+    if (member) {
+      member.unreadCount = (member.unreadCount || 0) + 1;
+      renderContactsList();
+    }
+  }
+
+  function isConversationFocused(conversationId) {
+    const pageIsFocused = typeof document.hasFocus !== 'function' || document.hasFocus();
+    return state.currentRoom.id === conversationId
+      && document.visibilityState !== 'hidden'
+      && pageIsFocused;
+  }
+
+  function clearActiveUnreadCount() {
+    const activeConversationId = state.currentRoom.id;
+    if (activeConversationId.startsWith('dm:')) {
+      const member = state.members.find(
+        (user) => user.id === state.currentRoom.directUserId
+      );
+      if (member?.unreadCount) {
+        member.unreadCount = 0;
+        renderContactsList();
+      }
+    } else {
+      const room = state.rooms.find((item) => item.id === activeConversationId);
+      if (room?.unreadCount) {
+        room.unreadCount = 0;
+        renderChannelsList();
+      }
+    }
+
+    renderMessages();
+    scrollToBottom();
   }
 
   function switchRoom(roomId) {
@@ -889,7 +947,9 @@
     if (!target) return;
 
     if (state.socket && state.socket.connected) {
-      state.socket.emit('room:leave', { roomId: state.currentRoom.id });
+      if (!state.currentRoom.isDirect) {
+        state.socket.emit('room:leave', { roomId: state.currentRoom.id });
+      }
       state.socket.emit('room:join', { roomId: target.id });
     }
 
@@ -897,6 +957,7 @@
     target.unreadCount = 0;
 
     renderChannelsList();
+    renderContactsList();
     renderChatHeader();
     renderMessages();
     scrollToBottom();
@@ -905,6 +966,29 @@
       loadAuditLogs();
     }
     loadRoomMedia(target.id);
+  }
+
+  function switchContact(userId) {
+    const member = state.members.find((user) => user.id === userId);
+    if (!member) return;
+
+    if (state.socket && state.socket.connected && !state.currentRoom.isDirect) {
+      state.socket.emit('room:leave', { roomId: state.currentRoom.id });
+    }
+
+    state.currentRoom = {
+      id: `dm:${member.id}`,
+      name: member.name,
+      isDirect: true,
+      directUserId: member.id,
+    };
+    member.unreadCount = 0;
+
+    renderChannelsList();
+    renderContactsList();
+    renderChatHeader();
+    renderMessages();
+    scrollToBottom();
   }
 
   function appendMediaMessage(media) {
@@ -953,6 +1037,10 @@
   async function uploadMediaFile(file) {
     const user = state.currentUser;
     const roomId = state.currentRoom.id;
+    if (state.currentRoom.isDirect) {
+      showToast('File sharing is available in rooms.', 'error');
+      return;
+    }
     if (!user?.token) {
       showToast('Sign in before sharing a file.', 'error');
       return;
@@ -1032,7 +1120,7 @@
     const clientMsgId = 'cmsg_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7);
 
     // Stop typing notification immediately
-    if (state.socket) {
+    if (state.socket && !state.currentRoom.isDirect) {
       state.socket.emit('typing:stop', { roomId });
     }
 
@@ -1060,7 +1148,10 @@
       state.socket.emit(
         'message:send',
         {
-          roomId,
+          roomId: state.currentRoom.isDirect ? null : roomId,
+          recipientId: state.currentRoom.isDirect
+            ? state.currentRoom.directUserId
+            : null,
           text,
           clientMsgId,
         },
@@ -1378,10 +1469,14 @@
         } else {
           // Emit typing:start
           if (state.socket && state.socket.connected) {
-            state.socket.emit('typing:start', { roomId: state.currentRoom.id });
+            if (!state.currentRoom.isDirect) {
+              state.socket.emit('typing:start', { roomId: state.currentRoom.id });
+            }
             clearTimeout(typingDebounceTimer);
             typingDebounceTimer = setTimeout(() => {
-              state.socket.emit('typing:stop', { roomId: state.currentRoom.id });
+              if (!state.currentRoom.isDirect) {
+                state.socket.emit('typing:stop', { roomId: state.currentRoom.id });
+              }
             }, 1800);
           }
         }
@@ -1390,6 +1485,11 @@
 
     const sendBtn = document.getElementById('sendBtn');
     if (sendBtn) sendBtn.addEventListener('click', sendMessage);
+
+    window.addEventListener('focus', clearActiveUnreadCount);
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') clearActiveUnreadCount();
+    });
 
     const xssBtn = document.getElementById('xssTestBtn');
     if (xssBtn) xssBtn.addEventListener('click', insertXssPayload);
@@ -1418,6 +1518,7 @@
     insertXssPayload,
     toggleReaction,
     switchRoom,
+    switchContact,
     switchPersona,
     openMuteModal,
     closeMuteModal,
