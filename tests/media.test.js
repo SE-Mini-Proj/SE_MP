@@ -154,4 +154,58 @@ describe('Room media sharing (AC-CHAT-F-050, TC-Media-01)', () => {
       config.media.maxFileSizeBytes = previousLimit;
     }
   });
+
+  it('rejects uploads with disallowed file extensions', async () => {
+    const response = await request(app)
+      .post(`/api/media/rooms/${ROOM_ID}`)
+      .set('Authorization', `Bearer ${token}`)
+      .set('Content-Type', 'application/x-msdownload')
+      .set('X-File-Name', 'malware.exe')
+      .send(Buffer.from('test executable'));
+
+    expect(response.status).toBe(400);
+    expect(response.body.code).toBe('UNSUPPORTED_FILE_TYPE');
+    expect(response.body.message).toBeTruthy();
+    expect(objectStorageService.putObject).not.toHaveBeenCalled();
+    expect(MediaModel.create).not.toHaveBeenCalled();
+  });
+
+  it('rejects uploads when MIME type does not match the file extension', async () => {
+    const response = await request(app)
+      .post(`/api/media/rooms/${ROOM_ID}`)
+      .set('Authorization', `Bearer ${token}`)
+      .set('Content-Type', 'image/jpeg')
+      .set('X-File-Name', 'photo.png')
+      .send(FILE_BODY);
+
+    expect(response.status).toBe(400);
+    expect(response.body.code).toBe('UNSUPPORTED_FILE_TYPE');
+    expect(response.body.message).toBeTruthy();
+    expect(objectStorageService.putObject).not.toHaveBeenCalled();
+    expect(MediaModel.create).not.toHaveBeenCalled();
+  });
+
+  it('returns a clear JSON error when Express rejects an oversized request', async () => {
+    const previousLimit = config.media.maxFileSizeBytes;
+    config.media.maxFileSizeBytes = 4;
+
+    try {
+      const response = await request(app)
+        .post(`/api/media/rooms/${ROOM_ID}`)
+        .set('Authorization', `Bearer ${token}`)
+        .set('Content-Type', 'image/png')
+        .set('X-File-Name', 'photo.png')
+        .send(Buffer.alloc(1024, 'a'));
+
+      expect(response.status).toBe(413);
+      expect(response.body).toMatchObject({
+        code: 'FILE_TOO_LARGE',
+        message: 'File exceeds the configured upload size limit',
+      });
+      expect(objectStorageService.putObject).not.toHaveBeenCalled();
+      expect(MediaModel.create).not.toHaveBeenCalled();
+    } finally {
+      config.media.maxFileSizeBytes = previousLimit;
+    }
+  });
 });

@@ -80,7 +80,7 @@ function validateUpload({ fileName, contentType, body }) {
   const expectedType = ALLOWED_FILE_TYPES.get(path.extname(name).toLowerCase());
   if (!expectedType || contentType !== expectedType) {
     throw createError(
-      415,
+      400,
       'UNSUPPORTED_FILE_TYPE',
       'Only supported image and document file types can be uploaded'
     );
