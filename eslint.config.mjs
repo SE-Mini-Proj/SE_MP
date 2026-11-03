@@ -18,6 +18,8 @@ export default [
         node: 'readonly',
         Buffer: 'readonly',
         URL: 'readonly',
+        URLSearchParams: 'readonly',
+        fetch: 'readonly',
         process: 'readonly',
         console: 'readonly',
         __dirname: 'readonly',
