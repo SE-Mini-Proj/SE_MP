@@ -37,15 +37,15 @@ class MessageModel {
     const params = [roomId];
 
     if (before) {
-      params.push(before);
-      queryText += ` AND m.created_at < $${params.length}`;
+      params.push(before.createdAt, before.id);
+      queryText += ` AND (m.created_at, m.id) < ($${params.length - 1}::timestamptz, $${params.length}::uuid)`;
     }
 
     params.push(limit);
-    queryText += ` ORDER BY m.created_at DESC LIMIT $${params.length};`;
+    queryText += ` ORDER BY m.created_at DESC, m.id DESC LIMIT $${params.length};`;
 
     const res = await db.query(queryText, params);
-    return res.rows.map((row) => new MessageModel(row));
+    return res.rows.reverse().map((row) => new MessageModel(row));
   }
 
   static async findDirectConversation({ user1Id, user2Id, limit = 50, before = null }) {
@@ -59,15 +59,15 @@ class MessageModel {
     const params = [user1Id, user2Id];
 
     if (before) {
-      params.push(before);
-      queryText += ` AND m.created_at < $${params.length}`;
+      params.push(before.createdAt, before.id);
+      queryText += ` AND (m.created_at, m.id) < ($${params.length - 1}::timestamptz, $${params.length}::uuid)`;
     }
 
     params.push(limit);
-    queryText += ` ORDER BY m.created_at DESC LIMIT $${params.length};`;
+    queryText += ` ORDER BY m.created_at DESC, m.id DESC LIMIT $${params.length};`;
 
     const res = await db.query(queryText, params);
-    return res.rows.map((row) => new MessageModel(row));
+    return res.rows.reverse().map((row) => new MessageModel(row));
   }
 
   static async markDelivered(messageId) {
