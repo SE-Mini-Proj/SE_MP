@@ -1,11 +1,10 @@
-
 const messagingService = require('../../services/messagingService');
 const { isUserOnline } = require('../../cache/presenceService');
 const { publishMessage } = require('../../cache/redisPubSub');
 const { enqueueOfflineMessage } = require('../../services/offlineMessageService');
 const { notifyUser } = require('../../services/pushNotificationService');
 
-function registerMessageHandler(io, socket,stopTyping = () => {}) {
+function registerMessageHandler(io, socket, stopTyping = () => {}) {
   socket.on('message:send', async (payload, callback) => {
     try {
       const { roomId, recipientId, text, clientMsgId } = payload || {};
@@ -45,19 +44,26 @@ function registerMessageHandler(io, socket,stopTyping = () => {}) {
         return;
       }
 
+      // Persist to database & sanitize (CHAT-F-040, CHAT-SR-004)
       const message = await messagingService.processMessage({
         roomId,
         recipientId,
         text,
         senderId: socket.user?.id || socket.id,
         clientMsgId,
+        delivered: false,
       });
+
       // Stop the typing indicator once the message has been processed.
-         if (roomId) {
-         stopTyping(roomId);
+      if (roomId) {
+        stopTyping(roomId);
       }
+
+      // Deliver message (Room broadcast or Direct Message)
       if (roomId) {
         io.to(roomId).emit('message:receive', message);
+        await messagingService.markMessageDelivered(message.messageId);
+        message.delivered = true;
       } else {
         try {
           await notifyUser(recipientId, message);
@@ -71,6 +77,7 @@ function registerMessageHandler(io, socket,stopTyping = () => {}) {
         const recipientOnline = await isUserOnline(recipientId);
         if (!recipientOnline) {
           await enqueueOfflineMessage(recipientId, message);
+          // AC-CHAT-F-040: Message persisted in database before offline queue acknowledgment
           if (typeof callback === 'function') {
             callback({ status: 'queued', message });
           }
@@ -78,6 +85,8 @@ function registerMessageHandler(io, socket,stopTyping = () => {}) {
         }
 
         io.to(`user:${recipientId}`).emit('message:receive', message);
+        await messagingService.markMessageDelivered(message.messageId);
+        message.delivered = true;
       }
 
       try {
@@ -89,6 +98,7 @@ function registerMessageHandler(io, socket,stopTyping = () => {}) {
         );
       }
 
+      // AC-CHAT-F-040: Every delivered message has a persisted record before acknowledgment
       if (typeof callback === 'function') {
         callback({ status: 'ok', message });
       }
