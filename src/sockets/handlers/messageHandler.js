@@ -65,16 +65,14 @@ function registerMessageHandler(io, socket, stopTyping = () => {}) {
         await messagingService.markMessageDelivered(message.messageId);
         message.delivered = true;
       } else {
-        try {
-          await notifyUser(recipientId, message);
-        } catch (notificationError) {
+        const recipientOnline = await isUserOnline(recipientId);
+        Promise.resolve(notifyUser(recipientId, message)).catch((notificationError) => {
           console.error(
             '[Notifications] Failed to send direct-message push:',
             notificationError.message
           );
-        }
+        });
 
-        const recipientOnline = await isUserOnline(recipientId);
         if (!recipientOnline) {
           await enqueueOfflineMessage(recipientId, message);
           // AC-CHAT-F-040: Message persisted in database before offline queue acknowledgment

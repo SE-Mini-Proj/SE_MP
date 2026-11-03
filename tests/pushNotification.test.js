@@ -1,4 +1,5 @@
 const crypto = require('node:crypto');
+const { afterEach, describe, expect, it, jest } = require('@jest/globals');
 
 jest.mock('../src/models/deviceTokenModel', () => ({
   upsert: jest.fn().mockResolvedValue(undefined),
@@ -15,12 +16,12 @@ const {
 } = require('../src/services/pushNotificationService');
 
 describe('FCM push notification service (CHAT-F-061, TC-Notif-02)', () => {
-  const originalFetch = global.fetch;
+  const originalFetch = globalThis.fetch;
   const originalAccount = process.env.FCM_SERVICE_ACCOUNT_JSON;
   const originalProjectId = process.env.FCM_PROJECT_ID;
 
   afterEach(() => {
-    global.fetch = originalFetch;
+    globalThis.fetch = originalFetch;
     if (originalAccount === undefined) delete process.env.FCM_SERVICE_ACCOUNT_JSON;
     else process.env.FCM_SERVICE_ACCOUNT_JSON = originalAccount;
     if (originalProjectId === undefined) delete process.env.FCM_PROJECT_ID;
@@ -56,7 +57,7 @@ describe('FCM push notification service (CHAT-F-061, TC-Notif-02)', () => {
     });
     delete process.env.FCM_PROJECT_ID;
     DeviceTokenModel.findByUserId.mockResolvedValue(['fcm-registration-token-123456789']);
-    global.fetch = jest.fn()
+    globalThis.fetch = jest.fn()
       .mockResolvedValueOnce({
         ok: true,
         json: async () => ({ access_token: 'oauth-access-token', expires_in: 3600 }),
@@ -73,8 +74,8 @@ describe('FCM push notification service (CHAT-F-061, TC-Notif-02)', () => {
       text: 'Hello from the chat',
     })).resolves.toEqual({ sent: 1, removedInvalidTokens: 0 });
 
-    expect(global.fetch).toHaveBeenCalledTimes(2);
-    const fcmRequest = global.fetch.mock.calls[1];
+    expect(globalThis.fetch).toHaveBeenCalledTimes(2);
+    const fcmRequest = globalThis.fetch.mock.calls[1];
     expect(fcmRequest[0]).toBe(
       'https://fcm.googleapis.com/v1/projects/chat-test-project/messages:send'
     );
@@ -97,7 +98,7 @@ describe('FCM push notification service (CHAT-F-061, TC-Notif-02)', () => {
 
   it('does not request FCM credentials when the recipient has no registered device', async () => {
     DeviceTokenModel.findByUserId.mockResolvedValue([]);
-    global.fetch = jest.fn();
+    globalThis.fetch = jest.fn();
 
     await expect(notifyUser('recipient-1', {
       senderId: 'sender-1',
@@ -105,6 +106,6 @@ describe('FCM push notification service (CHAT-F-061, TC-Notif-02)', () => {
       messageId: 'message-1',
       text: 'Hello',
     })).resolves.toEqual({ sent: 0 });
-    expect(global.fetch).not.toHaveBeenCalled();
+    expect(globalThis.fetch).not.toHaveBeenCalled();
   });
 });

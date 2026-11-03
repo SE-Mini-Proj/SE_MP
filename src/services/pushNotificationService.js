@@ -7,6 +7,7 @@ const FCM_SCOPE = 'https://www.googleapis.com/auth/firebase.messaging';
 
 let cachedAccessToken = null;
 let cachedAccessTokenExpiresAt = 0;
+let cachedAccessTokenAccount = null;
 
 function base64Url(value) {
   return Buffer.from(value).toString('base64url');
@@ -35,7 +36,15 @@ function getServiceAccount() {
 }
 
 async function getAccessToken(account) {
-  if (cachedAccessToken && Date.now() < cachedAccessTokenExpiresAt - 60_000) {
+  const accountKey = crypto
+    .createHash('sha256')
+    .update(`${account.project_id}:${account.client_email}:${account.private_key}`)
+    .digest('hex');
+  if (
+    cachedAccessToken
+    && cachedAccessTokenAccount === accountKey
+    && Date.now() < cachedAccessTokenExpiresAt - 60_000
+  ) {
     return cachedAccessToken;
   }
 
@@ -54,7 +63,7 @@ async function getAccessToken(account) {
     Buffer.from(unsignedAssertion),
     account.private_key
   ).toString('base64url');
-  const response = await fetch(TOKEN_URL, {
+  const response = await globalThis.fetch(TOKEN_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams({
@@ -74,12 +83,13 @@ async function getAccessToken(account) {
 
   cachedAccessToken = result.access_token;
   cachedAccessTokenExpiresAt = Date.now() + Number(result.expires_in || 3600) * 1000;
+  cachedAccessTokenAccount = accountKey;
   return cachedAccessToken;
 }
 
 async function sendToDevice(account, accessToken, token, message) {
   const endpoint = `https://fcm.googleapis.com/v1/projects/${encodeURIComponent(account.project_id)}/messages:send`;
-  const response = await fetch(endpoint, {
+  const response = await globalThis.fetch(endpoint, {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${accessToken}`,

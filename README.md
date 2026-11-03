@@ -109,6 +109,9 @@ npm run test:integration
 # Run HTTP and Socket.IO load scenarios (requires the app and Artillery)
 npm run test:load
 
+# Measure online direct-message sender-to-recipient p95 (requires app, PostgreSQL, Redis)
+npm run test:perf:socket
+
 # Run linter
 npm run lint
 ```
@@ -120,8 +123,15 @@ tests use Supertest against the Express app without opening a listening port.
 The Socket.IO suite starts an ephemeral HTTP server and connects with the
 Socket.IO client, so it verifies the real handshake and message event flow.
 
-Artillery scenarios in `tests/performance/` exercise `GET /api/health` and
-Socket.IO message delivery. Start the app in a separate terminal before running
-`npm run test:load`; the HTTP scenario enforces p95/p99 latency thresholds of
-500/1000 ms. Both scenarios use a 60-second phase at 10 new virtual users per
-second and can be run individually with `npx artillery run <scenario-file>`.
+The Artillery HTTP scenario in `tests/performance/http-load.yml` exercises
+`GET /api/health` and enforces p95/p99 thresholds of 500/1000 ms.
+`tests/performance/socket-latency.js` measures end-to-end time from sender
+`message:send` to recipient `message:receive` with both users online. It sends
+10 messages per second for 60 seconds by default and fails unless p95 is at
+most 1000 ms and every sent message arrives. Run the server with PostgreSQL
+and Redis available, and seed the default `alice` and `bob` accounts first.
+Configure alternate test accounts, target, rate, or duration with
+`PERF_SENDER_USERNAME`, `PERF_RECIPIENT_USERNAME`, `PERF_TARGET`,
+`PERF_MESSAGES_PER_SECOND`, and `PERF_DURATION_SECONDS`. Run just this check
+with `npm run test:perf:socket`, or run both the HTTP and socket scenarios with
+`npm run test:load`.
