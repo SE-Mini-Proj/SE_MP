@@ -3,6 +3,7 @@ const messagingService = require('../../services/messagingService');
 const { isUserOnline } = require('../../cache/presenceService');
 const { publishMessage } = require('../../cache/redisPubSub');
 const { enqueueOfflineMessage } = require('../../services/offlineMessageService');
+const { notifyUser } = require('../../services/pushNotificationService');
 
 function registerMessageHandler(io, socket,stopTyping = () => {}) {
   socket.on('message:send', async (payload, callback) => {
@@ -58,6 +59,15 @@ function registerMessageHandler(io, socket,stopTyping = () => {}) {
       if (roomId) {
         io.to(roomId).emit('message:receive', message);
       } else {
+        try {
+          await notifyUser(recipientId, message);
+        } catch (notificationError) {
+          console.error(
+            '[Notifications] Failed to send direct-message push:',
+            notificationError.message
+          );
+        }
+
         const recipientOnline = await isUserOnline(recipientId);
         if (!recipientOnline) {
           await enqueueOfflineMessage(recipientId, message);
