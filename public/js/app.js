@@ -1029,7 +1029,7 @@
 
     try {
       const response = await fetch(`/api/media/rooms/${encodeURIComponent(roomId)}`, {
-        headers: { Authorization: `****** },
+        headers: { Authorization: Bearer  },
       });
       const data = await response.json().catch(() => null);
       if (!response.ok) {
@@ -1061,7 +1061,7 @@
       const response = await fetch(`/api/media/rooms/${encodeURIComponent(roomId)}`, {
         method: 'POST',
         headers: {
-          Authorization: `******,
+          Authorization: Bearer ,
           'Content-Type': file.type || 'application/octet-stream',
           'X-File-Name': encodeURIComponent(file.name),
         },
@@ -1090,7 +1090,7 @@
 
     try {
       const response = await fetch(`/api/media/${encodeURIComponent(mediaId)}/download`, {
-        headers: { Authorization: `****** },
+        headers: { Authorization: Bearer  },
       });
       if (!response.ok) {
         const data = await response.json().catch(() => null);
@@ -1698,6 +1698,9 @@
     renderChatHeader();
     renderMessages();
     renderMembersList();
+    renderConfidenceChannels();
+    renderCampusPeers();
+    updateKpiMetrics();
 
     // 4. Initialize WebSocket
     initializeSocketConnection();
