@@ -2,15 +2,19 @@ const { sanitizeDeep } = require('../utils/sanitizer');
 
 /**
  * Express middleware to sanitize incoming request bodies, queries, and params against XSS attacks.
- * Excludes sensitive fields like password (which are hashed, not rendered) to prevent altering user secrets.
+ * Preserves secrets such as passwords and opaque device tokens exactly as submitted.
  */
 function xssSanitizerMiddleware(req, res, next) {
   if (req.body && typeof req.body === 'object') {
-    // Preserve raw passwords since passwords are never rendered to HTML and are hashed with bcrypt
+    // Passwords and opaque FCM tokens must not be changed by markup sanitization.
     const password = req.body.password;
+    const deviceToken = req.body.deviceToken;
     req.body = sanitizeDeep(req.body);
     if (password !== undefined) {
       req.body.password = password;
+    }
+    if (deviceToken !== undefined) {
+      req.body.deviceToken = deviceToken;
     }
   }
 

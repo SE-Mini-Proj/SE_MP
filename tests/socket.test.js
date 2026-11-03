@@ -56,7 +56,12 @@ jest.mock('../src/services/offlineMessageService', () => {
   };
 });
 
+jest.mock('../src/services/pushNotificationService', () => ({
+  notifyUser: jest.fn().mockResolvedValue({ sent: 1 }),
+}));
+
 const { isUserOnline } = require('../src/cache/presenceService');
+const { notifyUser } = require('../src/services/pushNotificationService');
 
 describe('WebSocket Gateway - Socket.IO Integration', () => {
   let server;
@@ -304,6 +309,7 @@ describe('WebSocket Gateway - Socket.IO Integration', () => {
 
   it('queues offline direct messages and delivers them in order on reconnect', async () => {
     const recipientId = 'user_offline_recipient';
+    notifyUser.mockClear();
     isUserOnline.mockResolvedValueOnce(false).mockResolvedValueOnce(false);
 
     const sendMessage = (clientMsgId, text) => new Promise((resolve, reject) => {
@@ -321,6 +327,14 @@ describe('WebSocket Gateway - Socket.IO Integration', () => {
     const secondQueued = await sendMessage('offline-2', 'Second message');
     expect(firstQueued.status).toBe('queued');
     expect(secondQueued.status).toBe('queued');
+    expect(notifyUser).toHaveBeenCalledWith(
+      recipientId,
+      expect.objectContaining({ text: 'First message' })
+    );
+    expect(notifyUser).toHaveBeenCalledWith(
+      recipientId,
+      expect.objectContaining({ text: 'Second message' })
+    );
 
     const receivedMessages = [];
     const recipientSocket = ioClient(`http://127.0.0.1:${serverPort}`, {

@@ -136,6 +136,26 @@
     }
   }
 
+  function renderMediaAttachmentHtml(media) {
+    return `
+      <div class="message-file">
+        <span class="message-file-icon" aria-hidden="true">📎</span>
+        <span class="message-file-name">${escapeHtml(media.fileName)}</span>
+        <span class="message-file-size">${formatFileSize(media.size)}</span>
+        <button class="msg-act-btn" type="button" title="Download ${escapeHtml(media.fileName)}"
+          onclick="window.hyperChat.downloadMedia('${escapeHtml(media.id)}')">Download</button>
+      </div>
+    `;
+  }
+
+  function formatFileSize(size) {
+    const bytes = Number(size);
+    if (!Number.isFinite(bytes) || bytes < 0) return '';
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  }
+
   // --- TOAST NOTIFICATIONS ---
   function showToast(message, type = 'info') {
     const container = document.getElementById('toast-container');
@@ -382,7 +402,9 @@
       showToast('WebSocket connected securely', 'success');
 
       // Join active room on connect
-      socket.emit('room:join', { roomId: state.currentRoom.id });
+      if (!state.currentRoom.isDirect) {
+        socket.emit('room:join', { roomId: state.currentRoom.id });
+      }
     });
 
     socket.on('connect_error', (err) => {
@@ -407,15 +429,16 @@
 
     // Real-Time Message Received (CHAT-F-011, CHAT-F-022, CHAT-SR-004)
     socket.on('message:receive', (msg) => {
-      const targetRoom = msg.roomId || state.currentRoom.id;
-      if (!state.messages[targetRoom]) {
-        state.messages[targetRoom] = [];
+      const conversationId = msg.roomId
+        || `dm:${msg.senderId === state.currentUser?.id ? msg.recipientId : msg.senderId}`;
+      if (!state.messages[conversationId]) {
+        state.messages[conversationId] = [];
       }
 
       // Check if message is already added (optimistic send prevention)
-      const existing = state.messages[targetRoom].find((m) => m.id === msg.messageId || (msg.clientMsgId && m.clientMsgId === msg.clientMsgId));
+      const existing = state.messages[conversationId].find((m) => m.id === msg.messageId || (msg.clientMsgId && m.clientMsgId === msg.clientMsgId));
       if (!existing) {
-        state.messages[targetRoom].push({
+        state.messages[conversationId].push({
           id: msg.messageId || 'msg_' + Date.now(),
           clientMsgId: msg.clientMsgId,
           senderId: msg.senderId,
@@ -423,20 +446,23 @@
           role: getSenderRole(msg.senderId),
           text: msg.text,
           timestamp: msg.timestamp || new Date().toISOString(),
-          roomId: targetRoom,
+          roomId: msg.roomId || null,
+          recipientId: msg.recipientId || null,
         });
 
         playNotificationChime();
 
-        if (targetRoom === state.currentRoom.id) {
+        if (isConversationFocused(conversationId)) {
           renderMessages();
           scrollToBottom();
         } else {
           // Increment unread badge for non-active channel (CHAT-F-060)
-          incrementUnreadBadge(targetRoom);
+          incrementUnreadBadge(conversationId);
         }
       }
     });
+
+    socket.on('media:shared', appendMediaMessage);
 
     // Real-Time Typing Indicator (CHAT-F-031)
     socket.on('typing:update', ({ userId, isTyping, roomId }) => {
@@ -588,18 +614,18 @@
       if (member.id === state.currentUser?.id) return;
 
       const item = document.createElement('div');
-      item.className = 'contact-item';
-      item.onclick = () => {
-        showToast(`Started direct message with ${member.name}`, 'info');
-      };
+      item.className = `contact-item ${state.currentRoom.directUserId === member.id ? 'active' : ''}`;
+      item.onclick = () => switchContact(member.id);
 
       const initial = member.name.substring(0, 1).toUpperCase();
+      const unreadCount = member.unreadCount || 0;
 
       item.innerHTML = `
         <div class="contact-info">
           <span class="presence-dot ${member.status === 'online' ? 'online' : 'idle'}"></span>
           <span>${escapeHtml(member.name)}</span>
         </div>
+        ${unreadCount > 0 ? `<span class="badge-unread">${unreadCount}</span>` : ''}
         <span class="role-tag ${member.role}" style="font-size:0.6rem;">${member.role}</span>
       `;
 
@@ -611,11 +637,28 @@
     const titleEl = document.getElementById('chatRoomName');
     const topicEl = document.getElementById('chatRoomTopic');
     if (titleEl) {
-      const lockIcon = state.currentRoom.isPrivate ? '🔒 ' : '# ';
-      titleEl.innerHTML = `${lockIcon}${escapeHtml(state.currentRoom.name)}`;
+      const prefix = state.currentRoom.isDirect
+        ? '↗ '
+        : state.currentRoom.isPrivate ? '🔒 ' : '# ';
+      titleEl.innerHTML = `${prefix}${escapeHtml(state.currentRoom.name)}`;
     }
     if (topicEl) {
-      topicEl.textContent = state.currentRoom.topic || 'Real-time discussion channel';
+      topicEl.textContent = state.currentRoom.isDirect
+        ? 'Direct message'
+        : state.currentRoom.topic || 'Real-time discussion channel';
+    }
+    const composer = document.getElementById('composerInput');
+    if (composer) {
+      composer.placeholder = state.currentRoom.isDirect
+        ? `Message ${state.currentRoom.name}...`
+        : `Message #${state.currentRoom.name}... (Enter to send, Shift+Enter for new line)`;
+    }
+    const attachButton = document.getElementById('attachFileBtn');
+    if (attachButton) {
+      attachButton.disabled = Boolean(state.currentRoom.isDirect);
+      attachButton.title = state.currentRoom.isDirect
+        ? 'File sharing is available in rooms'
+        : 'Share an image or document';
     }
   }
 
@@ -626,21 +669,14 @@
     const roomId = state.currentRoom.id;
     const msgs = state.messages[roomId] || [];
 
-    const feedPill = document.getElementById('feedCurrentRoomPill');
-    if (feedPill) {
-      feedPill.textContent = (state.currentRoom.isDirect || state.currentRoom.id.startsWith('dm_'))
-        ? '@ ' + state.currentRoom.name
-        : '# ' + state.currentRoom.name;
-    }
-
     container.innerHTML = '';
 
     if (msgs.length === 0) {
       container.innerHTML = `
         <div style="text-align:center; padding:3rem 1rem; color:var(--text-muted);">
           <div style="font-size:2rem; margin-bottom:8px;">💬</div>
-          <h4 style="color:var(--text-primary); margin-bottom:4px;">Welcome to #${escapeHtml(state.currentRoom.name)}</h4>
-          <p style="font-size:0.85rem;">This is the start of the #${escapeHtml(state.currentRoom.name)} channel.</p>
+          <h4 style="color:var(--text-primary); margin-bottom:4px;">${state.currentRoom.isDirect ? `Conversation with ${escapeHtml(state.currentRoom.name)}` : `Welcome to #${escapeHtml(state.currentRoom.name)}`}</h4>
+          <p style="font-size:0.85rem;">${state.currentRoom.isDirect ? 'This is the start of your direct conversation.' : `This is the start of the #${escapeHtml(state.currentRoom.name)} channel.`}</p>
         </div>
       `;
       return;
@@ -676,31 +712,19 @@
       // Check permissions: Owner/Moderator can delete messages (CHAT-SR-005, TC-Sec-05)
       const canDelete = state.currentUser?.role === 'owner' || state.currentUser?.role === 'moderator' || isOwn;
 
-      const isDirect = state.currentRoom.isDirect || state.currentRoom.id.startsWith('dm_');
-      const categoryTag = isDirect ? 'DIRECT MESSAGE' : `ROOM #${escapeHtml(state.currentRoom.name || state.currentRoom.id)}`;
-      const categoryClass = isDirect ? 'direct' : '';
-
       row.innerHTML = `
-        <div class="message-card-header">
-          <span class="message-category-pill ${categoryClass}">${categoryTag}</span>
-          <span class="message-dbms-badge" title="CHAT-F-040: Synchronously Persisted in PostgreSQL messages table">
-            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
-            PostgreSQL Persisted
-          </span>
+        <div class="message-avatar" style="background:${getAvatarColor(msg.senderId)};">
+          ${initial}
         </div>
-        <div style="display:flex; gap:12px; align-items:flex-start;">
-          <div class="message-avatar" style="background:${getAvatarColor(msg.senderId)};">
-            ${initial}
-          </div>
-          <div class="message-content">
+        <div class="message-content">
           <div class="message-meta">
             <span class="message-author ${isOwn ? 'is-own' : ''}">${escapeHtml(msg.senderName)}</span>
             <span class="role-tag ${role}" style="font-size:0.6rem;">${role}</span>
             <span class="message-time">${timeStr}</span>
           </div>
           <div class="message-body">${renderMessageBody(msg.text)}</div>
+          ${msg.media ? renderMediaAttachmentHtml(msg.media) : ''}
           ${renderReactionsHtml(msg.reactions)}
-        </div>
         </div>
         <div class="message-actions">
           <button class="msg-act-btn" title="React with 👍" onclick="window.hyperChat.toggleReaction('${msg.id}', '👍')">👍</button>
@@ -878,7 +902,44 @@
     if (room) {
       room.unreadCount = (room.unreadCount || 0) + 1;
       renderChannelsList();
+      return;
     }
+
+    const directUserId = roomId.startsWith('dm:') ? roomId.slice(3) : '';
+    const member = state.members.find((user) => user.id === directUserId);
+    if (member) {
+      member.unreadCount = (member.unreadCount || 0) + 1;
+      renderContactsList();
+    }
+  }
+
+  function isConversationFocused(conversationId) {
+    const pageIsFocused = typeof document.hasFocus !== 'function' || document.hasFocus();
+    return state.currentRoom.id === conversationId
+      && document.visibilityState !== 'hidden'
+      && pageIsFocused;
+  }
+
+  function clearActiveUnreadCount() {
+    const activeConversationId = state.currentRoom.id;
+    if (activeConversationId.startsWith('dm:')) {
+      const member = state.members.find(
+        (user) => user.id === state.currentRoom.directUserId
+      );
+      if (member?.unreadCount) {
+        member.unreadCount = 0;
+        renderContactsList();
+      }
+    } else {
+      const room = state.rooms.find((item) => item.id === activeConversationId);
+      if (room?.unreadCount) {
+        room.unreadCount = 0;
+        renderChannelsList();
+      }
+    }
+
+    renderMessages();
+    scrollToBottom();
   }
 
   function switchRoom(roomId) {
@@ -886,7 +947,9 @@
     if (!target) return;
 
     if (state.socket && state.socket.connected) {
-      state.socket.emit('room:leave', { roomId: state.currentRoom.id });
+      if (!state.currentRoom.isDirect) {
+        state.socket.emit('room:leave', { roomId: state.currentRoom.id });
+      }
       state.socket.emit('room:join', { roomId: target.id });
     }
 
@@ -902,14 +965,152 @@
     }
 
     renderChannelsList();
+    renderContactsList();
     renderChatHeader();
     renderMessages();
-    renderConfidenceChannels();
-    updateKpiMetrics();
     scrollToBottom();
 
     if (state.activeDrawerTab === 'audit') {
       loadAuditLogs();
+    }
+    loadRoomMedia(target.id);
+  }
+
+  function switchContact(userId) {
+    const member = state.members.find((user) => user.id === userId);
+    if (!member) return;
+
+    if (state.socket && state.socket.connected && !state.currentRoom.isDirect) {
+      state.socket.emit('room:leave', { roomId: state.currentRoom.id });
+    }
+
+    state.currentRoom = {
+      id: `dm:${member.id}`,
+      name: member.name,
+      isDirect: true,
+      directUserId: member.id,
+    };
+    member.unreadCount = 0;
+
+    renderChannelsList();
+    renderContactsList();
+    renderChatHeader();
+    renderMessages();
+    scrollToBottom();
+  }
+
+  function appendMediaMessage(media) {
+    const roomId = media.roomId;
+    if (!roomId) return;
+    if (!state.messages[roomId]) state.messages[roomId] = [];
+    if (state.messages[roomId].some((message) => message.id === media.id)) return;
+
+    state.messages[roomId].push({
+      id: media.id,
+      senderId: media.uploaderId,
+      senderName: media.uploaderName || getSenderDisplayName(media.uploaderId),
+      role: getSenderRole(media.uploaderId),
+      text: '',
+      timestamp: media.createdAt,
+      roomId,
+      media,
+    });
+
+    if (roomId === state.currentRoom.id) {
+      renderMessages();
+      scrollToBottom();
+    } else {
+      incrementUnreadBadge(roomId);
+    }
+  }
+
+  async function loadRoomMedia(roomId) {
+    if (!state.currentUser?.token || !/^[0-9a-f-]{36}$/i.test(roomId)) return;
+
+    try {
+      const response = await fetch(`/api/media/rooms/${encodeURIComponent(roomId)}`, {
+        headers: { Authorization: `****** },
+      });
+      const data = await response.json().catch(() => null);
+      if (!response.ok) {
+        throw new Error(data?.message || `HTTP error ${response.status}`);
+      }
+
+      (data.media || []).forEach(appendMediaMessage);
+    } catch (error) {
+      console.warn(`[Media] Could not load room files: ${error.message}`);
+    }
+  }
+
+  async function uploadMediaFile(file) {
+    const user = state.currentUser;
+    const roomId = state.currentRoom.id;
+    if (state.currentRoom.isDirect) {
+      showToast('File sharing is available in rooms.', 'error');
+      return;
+    }
+    if (!user?.token) {
+      showToast('Sign in before sharing a file.', 'error');
+      return;
+    }
+
+    const attachButton = document.getElementById('attachFileBtn');
+    if (attachButton) attachButton.disabled = true;
+
+    try {
+      const response = await fetch(`/api/media/rooms/${encodeURIComponent(roomId)}`, {
+        method: 'POST',
+        headers: {
+          Authorization: `******,
+          'Content-Type': file.type || 'application/octet-stream',
+          'X-File-Name': encodeURIComponent(file.name),
+        },
+        body: file,
+      });
+      const data = await response.json().catch(() => null);
+      if (!response.ok) {
+        throw new Error(data?.message || `HTTP error ${response.status}`);
+      }
+
+      appendMediaMessage(data.media);
+      showToast('File shared with the conversation.', 'success');
+    } catch (error) {
+      showToast(`File upload failed: ${error.message}`, 'error');
+    } finally {
+      if (attachButton) attachButton.disabled = false;
+    }
+  }
+
+  async function downloadMedia(mediaId) {
+    const user = state.currentUser;
+    if (!user?.token) {
+      showToast('Sign in before downloading a file.', 'error');
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/media/${encodeURIComponent(mediaId)}/download`, {
+        headers: { Authorization: `****** },
+      });
+      if (!response.ok) {
+        const data = await response.json().catch(() => null);
+        throw new Error(data?.message || `HTTP error ${response.status}`);
+      }
+
+      const blob = await response.blob();
+      const media = Object.values(state.messages)
+        .flat()
+        .find((message) => message.media?.id === mediaId)?.media;
+      const downloadUrl = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = downloadUrl;
+      link.download = media?.fileName || 'shared-file';
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.setTimeout(() => URL.revokeObjectURL(downloadUrl), 1000);
+    } catch (error) {
+      showToast(`File download failed: ${error.message}`, 'error');
     }
   }
 
@@ -927,7 +1128,7 @@
     const clientMsgId = 'cmsg_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7);
 
     // Stop typing notification immediately
-    if (state.socket) {
+    if (state.socket && !state.currentRoom.isDirect) {
       state.socket.emit('typing:stop', { roomId });
     }
 
@@ -948,7 +1149,6 @@
     };
     state.messages[roomId].push(localMsg);
     renderMessages();
-    updateKpiMetrics();
     scrollToBottom();
 
     // Emit via WebSocket (CHAT-F-011, CHAT-F-022)
@@ -956,7 +1156,10 @@
       state.socket.emit(
         'message:send',
         {
-          roomId,
+          roomId: state.currentRoom.isDirect ? null : roomId,
+          recipientId: state.currentRoom.isDirect
+            ? state.currentRoom.directUserId
+            : null,
           text,
           clientMsgId,
         },
@@ -1183,9 +1386,6 @@
     renderPersonaCard();
     renderMembersList();
     renderMessages();
-    renderCampusPeers();
-    renderConfidenceChannels();
-    updateKpiMetrics();
 
     // Reconnect socket with new token/credentials
     initializeSocketConnection();
@@ -1498,9 +1698,6 @@
     renderChatHeader();
     renderMessages();
     renderMembersList();
-    renderConfidenceChannels();
-    renderCampusPeers();
-    updateKpiMetrics();
 
     // 4. Initialize WebSocket
     initializeSocketConnection();
@@ -1517,10 +1714,14 @@
         } else {
           // Emit typing:start
           if (state.socket && state.socket.connected) {
-            state.socket.emit('typing:start', { roomId: state.currentRoom.id });
+            if (!state.currentRoom.isDirect) {
+              state.socket.emit('typing:start', { roomId: state.currentRoom.id });
+            }
             clearTimeout(typingDebounceTimer);
             typingDebounceTimer = setTimeout(() => {
-              state.socket.emit('typing:stop', { roomId: state.currentRoom.id });
+              if (!state.currentRoom.isDirect) {
+                state.socket.emit('typing:stop', { roomId: state.currentRoom.id });
+              }
             }, 1800);
           }
         }
@@ -1530,8 +1731,26 @@
     const sendBtn = document.getElementById('sendBtn');
     if (sendBtn) sendBtn.addEventListener('click', sendMessage);
 
+    window.addEventListener('focus', clearActiveUnreadCount);
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') clearActiveUnreadCount();
+    });
+
     const xssBtn = document.getElementById('xssTestBtn');
     if (xssBtn) xssBtn.addEventListener('click', insertXssPayload);
+
+    const attachFileBtn = document.getElementById('attachFileBtn');
+    const mediaFileInput = document.getElementById('mediaFileInput');
+    if (attachFileBtn && mediaFileInput) {
+      attachFileBtn.addEventListener('click', () => mediaFileInput.click());
+      mediaFileInput.addEventListener('change', () => {
+        const [file] = mediaFileInput.files || [];
+        mediaFileInput.value = '';
+        if (file) uploadMediaFile(file);
+      });
+    }
+
+    loadRoomMedia(state.currentRoom.id);
 
     // Initial audit logs pre-fetch
     loadAuditLogs();
@@ -1582,6 +1801,7 @@
     insertXssPayload,
     toggleReaction,
     switchRoom,
+    switchContact,
     switchPersona,
     openMuteModal,
     closeMuteModal,
@@ -1598,6 +1818,7 @@
     toggleDrawer,
     toggleSidebar,
     loadAuditLogs,
+    downloadMedia,
   };
 
   // Launch on DOM ready

@@ -1,6 +1,7 @@
 const express = require('express');
 const { createRoom, joinRoom,createRoomInvite, } = require('../controllers/roomController');
 const moderationController = require('../controllers/moderationController');
+const messageController = require('../controllers/messageController');
 const { authenticateJWT } = require('../middlewares/authMiddleware');
 const { requireRoomRole, ROLES } = require('../middlewares/rbacMiddleware');
 
@@ -9,6 +10,9 @@ const router = express.Router();
 // Core room management routes
 router.post('/', authenticateJWT, createRoom);
 router.post('/:roomId/join', authenticateJWT, joinRoom);
+
+// Paginated room message history (Issue #24)
+router.get('/:roomId/messages', authenticateJWT, messageController.getRoomMessageHistory);
 
 // Create an invitation for a private room.
 // The service verifies that the requester is authorized.
