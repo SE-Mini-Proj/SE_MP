@@ -83,7 +83,7 @@ async function getRoomMessageHistory({ roomId, userId, limit, before }) {
   });
 
   const hasMore = messages.length > pageLimit;
-  const pageMessages = hasMore ? messages.slice(0, pageLimit) : messages;
+  const pageMessages = hasMore ? messages.slice(1) : messages;
 
   return {
     messages: pageMessages,

@@ -78,8 +78,35 @@ describe('Message History Service', () => {
     );
 
     expect(decodedCursor).toEqual({
-      createdAt: messages[0].createdAt,
-      id: messages[0].id,
+      createdAt: messages[1].createdAt,
+      id: messages[1].id,
+    });
+  });
+
+  it('keeps the newest messages and excludes the extra oldest message', async () => {
+    MessageModel.findByRoomId.mockResolvedValue([
+      messages[0],
+      messages[1],
+      messages[2],
+    ]);
+
+    const result = await getRoomMessageHistory({
+      roomId: 'room-1',
+      userId: 'user-1',
+      limit: 2,
+    });
+
+    expect(result.messages).toEqual([messages[1], messages[2]]);
+    expect(result.messages).not.toContain(messages[0]);
+    expect(result.pagination.hasMore).toBe(true);
+
+    const decodedCursor = JSON.parse(
+      Buffer.from(result.pagination.nextCursor, 'base64url').toString('utf8')
+    );
+
+    expect(decodedCursor).toEqual({
+      createdAt: messages[1].createdAt,
+      id: messages[1].id,
     });
   });
 
