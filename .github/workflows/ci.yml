@@ -13,7 +13,7 @@ permissions:
 
 jobs:
   ci:
-    name: Lint, Migrate, Test and Build
+    name: Lint Score, Unit Tests, Branch Analysis, and System Tests
     runs-on: ubuntu-latest
 
     services:
@@ -66,8 +66,11 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Run ESLint
-        run: npm run lint
+      - name: Code Quality & Lint Score Analysis
+        run: npm run lint:score
+
+      - name: Run Unit Tests
+        run: npm run test:unit
 
       - name: Run database migrations
         run: npm run db:migrate
@@ -160,8 +163,13 @@ jobs:
           });
           NODE
 
-      - name: Run automated tests
-        run: npm test
+      - name: Run System & Integration Tests
+        run: npm run test:system
+
+      - name: Code and Branch Coverage Analysis
+        run: |
+          npm run test:coverage
+          npm run coverage:summary
 
       - name: Build verification
         run: npm run build
