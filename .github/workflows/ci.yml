@@ -46,14 +46,14 @@ jobs:
 
     env:
       NODE_ENV: test
-      DB_HOST: localhost
+      DB_HOST: 127.0.0.1
       DB_PORT: 5432
       DB_NAME: chat_db
       DB_USER: postgres
       DB_PASSWORD: postgres
       DB_SSL: "false"
-      DATABASE_URL: postgres://postgres:postgres@localhost:5432/chat_db
-      REDIS_HOST: localhost
+      DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/chat_db
+      REDIS_HOST: 127.0.0.1
       REDIS_PORT: 6379
 
     steps:
@@ -77,7 +77,7 @@ jobs:
 
       - name: Code and Branch Coverage Analysis
         run: |
-          npm run test:unit -- --coverage
+          npm run test:unit:coverage
           npm run coverage:summary
 
   # =========================================================================
@@ -137,14 +137,14 @@ jobs:
 
     env:
       NODE_ENV: test
-      DB_HOST: localhost
+      DB_HOST: 127.0.0.1
       DB_PORT: 5432
       DB_NAME: chat_db
       DB_USER: postgres
       DB_PASSWORD: postgres
       DB_SSL: "false"
-      DATABASE_URL: postgres://postgres:postgres@localhost:5432/chat_db
-      REDIS_HOST: localhost
+      DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/chat_db
+      REDIS_HOST: 127.0.0.1
       REDIS_PORT: 6379
 
     steps:
