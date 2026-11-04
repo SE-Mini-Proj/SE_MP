@@ -68,25 +68,28 @@ describe('Redis Pub/Sub Integration (Issue #3)', () => {
     );
   });
 
-  function receiveOne(subscriber, targetChannel) {
-    return new Promise((resolve, reject) => {
-      const timer = setTimeout(() => {
-        reject(new Error(`Timed out waiting on ${targetChannel}`));
-      }, timeoutMs);
-
-      subscriber.subscribe(targetChannel, (message) => {
-        clearTimeout(timer);
-
-        try {
-          resolve(JSON.parse(message));
-        } catch (error) {
-          reject(error);
-        }
-      }).catch((error) => {
-        clearTimeout(timer);
-        reject(error);
-      });
+  async function subscribeAndCapture(subscriber, targetChannel) {
+    let resolveMsg;
+    let rejectMsg;
+    const msgPromise = new Promise((resolve, reject) => {
+      resolveMsg = resolve;
+      rejectMsg = reject;
     });
+
+    const timer = setTimeout(() => {
+      rejectMsg(new Error(`Timed out waiting on ${targetChannel}`));
+    }, timeoutMs);
+
+    await subscriber.subscribe(targetChannel, (message) => {
+      clearTimeout(timer);
+      try {
+        resolveMsg(JSON.parse(message));
+      } catch (error) {
+        rejectMsg(error);
+      }
+    });
+
+    return msgPromise;
   }
 
   it('delivers a published event to a separate subscriber', async () => {
@@ -103,17 +106,13 @@ describe('Redis Pub/Sub Integration (Issue #3)', () => {
       originInstanceId: 'test-instance-A',
     };
 
-    const received = receiveOne(subscriberB, channel);
-
-    await new Promise((resolve) => setTimeout(resolve, 100));
+    const received = await subscribeAndCapture(subscriberB, channel);
     await publisher.publish(channel, JSON.stringify(event));
 
     const result = await received;
 
     expect(result.eventName).toBe('test:cross-instance');
-    expect(result.payload.message).toBe(
-      'Redis Pub/Sub integration works'
-    );
+    expect(result.payload.message).toBe('Redis Pub/Sub integration works');
     expect(result.originInstanceId).toBe('test-instance-A');
   }, 10000);
 
@@ -125,10 +124,8 @@ describe('Redis Pub/Sub Integration (Issue #3)', () => {
 
     const testChannel = `${channel}:room`;
 
-    const receivedA = receiveOne(subscriberA, testChannel);
-    const receivedB = receiveOne(subscriberB, testChannel);
-
-    await new Promise((resolve) => setTimeout(resolve, 100));
+    const receivedA = await subscribeAndCapture(subscriberA, testChannel);
+    const receivedB = await subscribeAndCapture(subscriberB, testChannel);
 
     const roomEvent = {
       roomId: 'room-integration-test',
