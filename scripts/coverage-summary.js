@@ -83,3 +83,4 @@ ${fileRows || '| _No individual files listed_ | - | - | - | - |'}
 }
 
 generateReport();
+

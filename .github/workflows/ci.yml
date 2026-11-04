@@ -12,8 +12,62 @@ permissions:
   contents: read
 
 jobs:
-  ci:
-    name: Lint Score, Unit Tests, Branch Analysis, and System Tests
+  # =========================================================================
+  # JOB 1: Dedicated Unit Testing & Branch Coverage Analysis
+  # =========================================================================
+  unit-tests:
+    name: Unit Testing & Branch Coverage Analysis
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run Unit Test Suites
+        run: npm run test:unit
+
+      - name: Code and Branch Coverage Analysis
+        run: |
+          npm run test:coverage
+          npm run coverage:summary
+
+  # =========================================================================
+  # JOB 2: Code Quality & 10-Point Lint Score Analysis
+  # =========================================================================
+  lint-and-code-quality:
+    name: Code Quality & Lint Score Analysis
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run ESLint & Calculate Lint Score (10.00 / 10.00)
+        run: npm run lint:score
+
+  # =========================================================================
+  # JOB 3: System, Database, and Integration Testing
+  # =========================================================================
+  system-and-integration-tests:
+    name: System & Integration Testing (Postgres & Redis)
     runs-on: ubuntu-latest
 
     services:
@@ -65,12 +119,6 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
-
-      - name: Code Quality & Lint Score Analysis
-        run: npm run lint:score
-
-      - name: Run Unit Tests
-        run: npm run test:unit
 
       - name: Run database migrations
         run: npm run db:migrate
@@ -165,11 +213,6 @@ jobs:
 
       - name: Run System & Integration Tests
         run: npm run test:system
-
-      - name: Code and Branch Coverage Analysis
-        run: |
-          npm run test:coverage
-          npm run coverage:summary
 
       - name: Build verification
         run: npm run build
