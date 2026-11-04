@@ -1,4 +1,5 @@
 const { Server } = require('socket.io');
+const logger = require('../services/loggerService');
 const config = require('../config');
 const { verifyToken } = require('../services/authService');
 const registerMessageHandler = require('./handlers/messageHandler');
@@ -88,7 +89,7 @@ function initializeSocket(httpServer) {
       } else if (event.recipientId) {
         io.to(`user:${event.recipientId}`).emit('message:receive', event);
       } else {
-        console.error('[Messaging] Dropped direct message without a recipient');
+        logger.warn('socket.message_dropped', 'Dropped direct message without a recipient');
       }
 
       return;
@@ -146,9 +147,10 @@ function initializeSocket(httpServer) {
     socket.join(`user:${socket.user.id}`);
 
     if (config.nodeEnv !== 'test') {
-      console.log(
-        `[WebSocket] Client connected: ${socket.id} (User: ${socket.user.id})`
-      );
+      logger.info('socket.client_connected', 'WebSocket client connected', {
+        socketId: socket.id,
+        userId: socket.user.id,
+      });
     }
 
     const acknowledgement = {

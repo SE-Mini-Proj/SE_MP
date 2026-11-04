@@ -1,46 +1,15 @@
 const AuditLogModel = require('../models/auditLogModel');
+const logger = require('./loggerService');
 
 // In-memory fallback cache for testing environments without active database
 const inMemoryAuditLogs = [];
 
-const SENSITIVE_KEYS = new Set([
-  'password',
-  'password_hash',
-  'passwordhash',
-  'token',
-  'jwt',
-  'secret',
-  'authorization',
-  'apikey',
-  'api_key',
-  'creditcard',
-  'credit_card',
-]);
-
 /**
- * Recursively strip/redact sensitive keys per SAD §4.4 and STRIDE
+ * Recursively redact sensitive audit metadata.
+ * Uses the centralized logger sanitizer to keep protection consistent.
  */
 function sanitizeAuditMetadata(obj) {
-  if (!obj || typeof obj !== 'object') {
-    return obj;
-  }
-
-  if (Array.isArray(obj)) {
-    return obj.map(sanitizeAuditMetadata);
-  }
-
-  const clean = {};
-  for (const [key, value] of Object.entries(obj)) {
-    const lowerKey = key.toLowerCase();
-    if (SENSITIVE_KEYS.has(lowerKey)) {
-      clean[key] = '[REDACTED]';
-    } else if (typeof value === 'object' && value !== null) {
-      clean[key] = sanitizeAuditMetadata(value);
-    } else {
-      clean[key] = value;
-    }
-  }
-  return clean;
+  return logger.sanitizeValue(obj);
 }
 
 /**
@@ -93,10 +62,16 @@ async function recordAuditLog({
 
   inMemoryAuditLogs.unshift(auditEntry);
 
-  // Structured console log output (reproducible, searchable in stdout/SIEM)
-  console.info(
-    `[AUDIT] action="${auditEntry.action}" actor_id="${auditEntry.actorId}" target_type="${auditEntry.targetType}" target_id="${auditEntry.targetId || 'none'}" room_id="${auditEntry.roomId || 'global'}" timestamp="${auditEntry.createdAt.toISOString()}"`
-  );
+  // Structured audit event with sensitive metadata redacted.
+  logger.info('audit.action', 'Moderation action recorded', {
+    actorId: auditEntry.actorId,
+    action: auditEntry.action,
+    targetType: auditEntry.targetType,
+    targetId: auditEntry.targetId,
+    roomId: auditEntry.roomId,
+    metadata: sanitizedMetadata,
+    auditTimestamp: auditEntry.createdAt.toISOString(),
+  });
 
   return auditEntry;
 }

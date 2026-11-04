@@ -1,6 +1,7 @@
 const { pipeline } = require('node:stream');
 const mediaService = require('../services/mediaService');
 const { publishRoomEvent } = require('../cache/redisPubSub');
+const logger = require('../services/loggerService');
 
 function decodeFileName(headerValue) {
   if (!headerValue) return '';
@@ -34,7 +35,10 @@ async function uploadRoomMedia(req, res, next) {
         payload: media,
       });
     } catch (error) {
-      console.error('[Media] Failed to publish room event:', error.message);
+      logger.error('media.room_event_publish_failed', 'Failed to publish room media event', {
+        roomId: media.roomId,
+        errorMessage: error.message,
+      });
     }
 
     return res.status(201).json({ status: 'ok', media });
@@ -73,7 +77,10 @@ async function downloadMedia(req, res, next) {
     pipeline(stream, res, (error) => {
       if (!error) return;
       if (res.headersSent) {
-        console.error('[Media] Download stream failed:', error.message);
+        logger.error('media.download_stream_failed', 'Media download stream failed', {
+          mediaId: req.params.mediaId,
+          errorMessage: error.message,
+        });
         return;
       }
       return next(error);

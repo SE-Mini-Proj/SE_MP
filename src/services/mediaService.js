@@ -4,6 +4,7 @@ const config = require('../config');
 const MediaModel = require('../models/mediaModel');
 const RoomModel = require('../models/roomModel');
 const objectStorageService = require('./objectStorageService');
+const logger = require('./loggerService');
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const ALLOWED_FILE_TYPES = new Map([
@@ -114,7 +115,9 @@ async function uploadToRoom({ roomId, userId, fileName, contentType, body }) {
     try {
       await objectStorageService.deleteObject({ key: storageKey });
     } catch (cleanupError) {
-      console.error('[Media] Failed to remove unreferenced object:', cleanupError.message);
+      logger.error('media.storage_cleanup_failed', 'Failed to remove unreferenced storage object', {
+        errorMessage: cleanupError.message,
+      });
     }
     throw error;
   }

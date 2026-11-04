@@ -1,6 +1,7 @@
 const http = require('http');
 const app = require('./app');
 const config = require('./config');
+const logger = require('./services/loggerService');
 const { initializeSocket } = require('./sockets');
 
 const {
@@ -28,38 +29,36 @@ if (process.env.NODE_ENV !== 'test') {
       await initializePubSub(handleRedisEvent);
 
       server.listen(config.port, () => {
-        console.log(
-          `[Server] Real-Time Chat Server running on http://localhost:${config.port}`
-        );
-        console.log(`[Server] Environment: ${config.nodeEnv}`);
-        console.log(
-          `[Server] WebSocket Gateway initialized on port ${config.port}`
-        );
-        console.log('[Server] Redis clients connected successfully');
-        console.log('[Server] Redis Pub/Sub initialized successfully');
+        logger.info('server.started', 'Real-Time Chat Server started', {
+          port: config.port,
+          environment: config.nodeEnv,
+        });
+        logger.info('server.websocket_ready', 'WebSocket Gateway initialized', {
+          port: config.port,
+        });
+        logger.info('server.redis_connected', 'Redis clients connected successfully');
+        logger.info('server.pubsub_initialized', 'Redis Pub/Sub initialized successfully');
       });
     } catch (error) {
-      console.error(
-        '[Server] Failed to initialize Redis:',
-        error.message
-      );
+      logger.error('server.initialization_failed', 'Server initialization failed', {
+        errorName: error.name,
+        errorMessage: error.message,
+      });
 
       try {
         await closePubSub();
       } catch (cleanupError) {
-        console.error(
-          '[Server] Failed to close Redis Pub/Sub:',
-          cleanupError.message
-        );
+        logger.error('server.cleanup_failed', 'Failed to close Redis Pub/Sub', {
+          errorMessage: cleanupError.message,
+        });
       }
 
       try {
         await closeRedis();
       } catch (cleanupError) {
-        console.error(
-          '[Server] Failed to close Redis clients:',
-          cleanupError.message
-        );
+        logger.error('server.cleanup_failed', 'Failed to close Redis clients', {
+          errorMessage: cleanupError.message,
+        });
       }
 
       process.exitCode = 1;
@@ -78,36 +77,33 @@ async function handleShutdown(signal) {
 
   isShuttingDown = true;
 
-  console.log(
-    `\n[Server] Received ${signal}. Closing HTTP, WebSocket, Redis, and Database connections...`
-  );
+  logger.info('server.shutdown_started', 'Server shutdown initiated', {
+    signal,
+  });
 
   try {
     await closePubSub();
   } catch (error) {
-    console.error(
-      '[Server Error] Error closing Redis Pub/Sub:',
-      error.message
-    );
+    logger.error('server.shutdown_failed', 'Failed to close Redis Pub/Sub', {
+      errorMessage: error.message,
+    });
   }
 
   try {
     await closeRedis();
   } catch (error) {
-    console.error(
-      '[Server Error] Error closing Redis connections:',
-      error.message
-    );
+    logger.error('server.shutdown_failed', 'Failed to close Redis connections', {
+      errorMessage: error.message,
+    });
   }
 
   try {
     const { closePool } = require('./db');
     await closePool();
   } catch (error) {
-    console.error(
-      '[Server Error] Error closing database pool:',
-      error.message
-    );
+    logger.error('server.shutdown_failed', 'Failed to close database pool', {
+      errorMessage: error.message,
+    });
   }
 
   if (io) {
@@ -120,7 +116,7 @@ async function handleShutdown(signal) {
   }
 
   server.close(() => {
-    console.log('[Server] Server shut down gracefully.');
+    logger.info('server.shutdown_complete', 'Server shut down gracefully');
     process.exit(0);
   });
 }
