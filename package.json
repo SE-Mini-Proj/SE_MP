@@ -8,15 +8,20 @@
     "dev": "nodemon src/server.js",
     "test": "jest --runInBand",
     "test:watch": "jest --watch",
-    "test:unit": "jest tests/services.test.js --runInBand",
-    "test:integration": "jest tests/db.test.js tests/health.test.js tests/socket.test.js --runInBand",
+    "test:unit": "jest tests/services.test.js tests/registration.test.js tests/offlineMessageService.test.js tests/roomModel.test.js tests/pushNotification.test.js tests/messageModel.pagination.test.js tests/auth.test.js --runInBand",
+    "test:integration": "npm run test:system",
     "test:load": "artillery run tests/performance/http-load.yml && artillery run tests/performance/socket-load.yml",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "build": "node -e \"console.log('Build verification complete')\"",
     "db:migrate": "node src/db/migrate.js up",
     "db:migrate:down": "node src/db/migrate.js down",
-    "db:seed": "node src/db/seed.js"
+    "db:seed": "node src/db/seed.js",
+    "start:frontend": "node start-frontend.js",
+    "test:system": "jest tests/db.test.js tests/health.test.js tests/socket.test.js tests/redis.integration.test.js tests/messagePersistence.test.js tests/messageHistory.test.js tests/media.test.js tests/rbac.test.js tests/tls.test.js tests/xss.test.js tests/authentication.test.js --runInBand",
+    "test:coverage": "jest --coverage --runInBand",
+    "coverage:summary": "node scripts/coverage-summary.js",
+    "lint:score": "node scripts/lint-score.js"
   },
   "repository": {
     "type": "git",
