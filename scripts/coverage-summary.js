@@ -1,86 +1,67 @@
 #!/usr/bin/env node
 /**
- * Code and Branch Coverage Analysis Reporter
- * Reads coverage/coverage-summary.json and generates a comprehensive analysis table
- * formatted for both terminal stdout and GitHub Step Summary ($GITHUB_STEP_SUMMARY).
+ * Branch & Code Coverage Analysis Reporter
+ * Validates that Branch Coverage is >= 75.0% and formats summary tables.
  */
 
 const fs = require('fs');
 const path = require('path');
 
-function generateReport() {
-  const summaryPath = path.resolve(process.cwd(), 'coverage', 'coverage-summary.json');
+const summaryPath = path.resolve(__dirname, '../coverage/coverage-summary.json');
 
-  if (!fs.existsSync(summaryPath)) {
-    console.warn('⚠️ No coverage summary found at', summaryPath);
-    return;
-  }
+if (!fs.existsSync(summaryPath)) {
+  console.error('❌ Error: coverage/coverage-summary.json not found. Run tests with coverage first.');
+  process.exit(1);
+}
 
-  const raw = fs.readFileSync(summaryPath, 'utf-8');
-  let data;
-  try {
-    data = JSON.parse(raw);
-  } catch (err) {
-    console.error('❌ Failed to parse coverage JSON:', err.message);
-    return;
-  }
+const summary = JSON.parse(fs.readFileSync(summaryPath, 'utf8'));
+const total = summary.total;
 
-  const total = data.total || {};
-  const stmts = total.statements?.pct ?? '0.00';
-  const branches = total.branches?.pct ?? '0.00';
-  const funcs = total.functions?.pct ?? '0.00';
-  const lines = total.lines?.pct ?? '0.00';
+const branchPct = Number(total.branches.pct);
+const stmtPct = Number(total.statements.pct);
+const linePct = Number(total.lines.pct);
+const funcPct = Number(total.functions.pct);
 
-  console.log('\n================================================================');
-  console.log('🌿 CODE & BRANCH COVERAGE ANALYSIS SUMMARY');
-  console.log('================================================================\n');
-  console.log(`Statements Coverage:   ${stmts}% (${total.statements?.covered || 0}/${total.statements?.total || 0})`);
-  console.log(`Branch Analysis:       ${branches}% (${total.branches?.covered || 0}/${total.branches?.total || 0})`);
-  console.log(`Functions Coverage:    ${funcs}% (${total.functions?.covered || 0}/${total.functions?.total || 0})`);
-  console.log(`Lines Coverage:        ${lines}% (${total.lines?.covered || 0}/${total.lines?.total || 0})`);
-  console.log('----------------------------------------------------------------');
+const REQUIRED_BRANCH_COVERAGE = 75.0;
 
-  const branchPctNum = parseFloat(branches);
-  const status = branchPctNum >= 75 ? 'PASSED (Branch threshold met)' : 'NOTICE (Review uncovered branches)';
-  console.log(`Branch Analysis Status: ${status}`);
-  console.log('================================================================\n');
+console.log('\n================================================================');
+console.log('📈 CODE AND BRANCH COVERAGE ANALYSIS REPORT');
+console.log('================================================================\n');
 
-  if (process.env.GITHUB_STEP_SUMMARY) {
-    let fileRows = '';
-    Object.keys(data).forEach((filePath) => {
-      if (filePath === 'total') return;
-      const relPath = path.relative(process.cwd(), filePath).replace(/\\/g, '/');
-      const f = data[filePath];
-      fileRows += `| \`${relPath}\` | \`${f.statements?.pct}%\` | \`${f.branches?.pct}%\` | \`${f.functions?.pct}%\` | \`${f.lines?.pct}%\` |\n`;
-    });
+console.log(`🌿 Branch Coverage:     ${branchPct.toFixed(2)}%  (${total.branches.covered} / ${total.branches.total})  [Required: >= ${REQUIRED_BRANCH_COVERAGE}%]`);
+console.log(`📝 Statement Coverage:  ${stmtPct.toFixed(2)}%  (${total.statements.covered} / ${total.statements.total})`);
+console.log(`⚡ Function Coverage:   ${funcPct.toFixed(2)}%  (${total.functions.covered} / ${total.functions.total})`);
+console.log(`📄 Line Coverage:       ${linePct.toFixed(2)}%  (${total.lines.covered} / ${total.lines.total})`);
+console.log('----------------------------------------------------------------');
 
-    const markdown = `
-### 🌿 Code & Branch Coverage Analysis
+const meetsRequirement = branchPct >= REQUIRED_BRANCH_COVERAGE;
+if (meetsRequirement) {
+  console.log(`✅ SUCCESS: Branch coverage of ${branchPct.toFixed(2)}% satisfies the >= 75% requirement!`);
+} else {
+  console.error(`❌ FAILURE: Branch coverage of ${branchPct.toFixed(2)}% is below the required ${REQUIRED_BRANCH_COVERAGE}% threshold!`);
+}
+console.log('================================================================\n');
 
-| Metric | Coverage | Covered / Total | Threshold Status |
-| :--- | :---: | :---: | :---: |
-| **Branch Analysis (% Branch)** | **\`${branches}%\`** | \`${total.branches?.covered || 0} / ${total.branches?.total || 0}\` | ${parseFloat(branches) >= 70 ? '🟢 Met' : '🟡 Fair'} |
-| **Statement Coverage (% Stmts)** | **\`${stmts}%\`** | \`${total.statements?.covered || 0} / ${total.statements?.total || 0}\` | 🟢 Met |
-| **Function Coverage (% Funcs)** | **\`${funcs}%\`** | \`${total.functions?.covered || 0} / ${total.functions?.total || 0}\` | 🟢 Met |
-| **Line Coverage (% Lines)** | **\`${lines}%\`** | \`${total.lines?.covered || 0} / ${total.lines?.total || 0}\` | 🟢 Met |
+if (process.env.GITHUB_STEP_SUMMARY) {
+  const markdown = `
+### 📈 Code & Branch Coverage Summary
 
-<details>
-<summary><b>📂 Detailed File-by-File Coverage & Branch Breakdown</b></summary>
+| Metric | Coverage | Covered / Total | Requirement | Status |
+| :--- | :--- | :--- | :--- | :--- |
+| **🌿 Branches** | **\`${branchPct.toFixed(2)}%\`** | \`${total.branches.covered} / ${total.branches.total}\` | \`>= 75.0%\` | ${meetsRequirement ? '✅ **PASSED**' : '❌ **FAILED**'} |
+| **📝 Statements** | **\`${stmtPct.toFixed(2)}%\`** | \`${total.statements.covered} / ${total.statements.total}\` | - | ✅ |
+| **⚡ Functions** | **\`${funcPct.toFixed(2)}%\`** | \`${total.functions.covered} / ${total.functions.total}\` | - | ✅ |
+| **📄 Lines** | **\`${linePct.toFixed(2)}%\`** | \`${total.lines.covered} / ${total.lines.total}\` | - | ✅ |
 
-| File Path | % Stmts | % Branch | % Funcs | % Lines |
-| :--- | :---: | :---: | :---: | :---: |
-${fileRows || '| _No individual files listed_ | - | - | - | - |'}
-
-</details>
+> **Branch Coverage Status**: ${meetsRequirement ? '✅ **Branch coverage requirement (>= 75%) successfully achieved.**' : '❌ **Branch coverage below threshold.**'}
 `;
-
-    try {
-      fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, markdown, 'utf-8');
-    } catch (e) {
-      console.warn('Failed to append to GITHUB_STEP_SUMMARY:', e.message);
-    }
+  try {
+    fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, markdown, 'utf-8');
+  } catch (err) {
+    console.warn('Could not write to GITHUB_STEP_SUMMARY:', err.message);
   }
 }
 
-generateReport();
-
+if (!meetsRequirement) {
+  process.exit(1);
+}

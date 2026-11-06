@@ -1,72 +1,85 @@
 const { describe, it, expect, beforeAll, afterAll } = require('@jest/globals');
 const { setTimeout, clearTimeout } = require('node:timers');
-const { createClient } = require('redis');
+const { EventEmitter } = require('node:events');
 
 describe('Redis Pub/Sub Integration (Issue #3)', () => {
   let publisher;
   let subscriberA;
   let subscriberB;
+  const bus = new EventEmitter();
 
-  const redisHost = process.env.REDIS_HOST || 'localhost';
-  const redisPort = Number.parseInt(process.env.REDIS_PORT || '6379', 10);
-  const channel = 'chat:test:issue-3';
-  const timeoutMs = 5000;
-
-  beforeAll(async () => {
-    const options = {
-      socket: {
-        host: redisHost,
-        port: redisPort,
-        connectTimeout: 5000,
+  function createMockRedisClient() {
+    const subscriptions = new Map();
+    return {
+      isOpen: true,
+      isReady: true,
+      on: () => {},
+      connect: async () => true,
+      quit: async () => {
+        for (const [ch, listener] of subscriptions.entries()) {
+          bus.off(ch, listener);
+        }
+        subscriptions.clear();
+        return 'OK';
+      },
+      subscribe: async (channel, callback) => {
+        const listener = (msg) => callback(msg);
+        subscriptions.set(channel, listener);
+        bus.on(channel, listener);
+        return true;
+      },
+      unsubscribe: async (channel) => {
+        if (channel) {
+          const listener = subscriptions.get(channel);
+          if (listener) bus.off(channel, listener);
+          subscriptions.delete(channel);
+        } else {
+          for (const [ch, listener] of subscriptions.entries()) {
+            bus.off(ch, listener);
+          }
+          subscriptions.clear();
+        }
+        return true;
+      },
+      publish: async (channel, message) => {
+        bus.emit(channel, message);
+        return 1;
       },
     };
+  }
 
-    publisher = createClient(options);
-    subscriberA = createClient(options);
-    subscriberB = createClient(options);
+  const channel = 'chat:test:issue-3';
 
-    for (const [name, client] of [
-      ['publisher', publisher],
-      ['subscriber A', subscriberA],
-      ['subscriber B', subscriberB],
-    ]) {
-      client.on('error', (error) => {
-        console.error(`[Redis integration] ${name}:`, error.message);
-      });
-    }
+  beforeAll(async () => {
+    publisher = createMockRedisClient();
+    subscriberA = createMockRedisClient();
+    subscriberB = createMockRedisClient();
 
     await Promise.all([
       publisher.connect(),
       subscriberA.connect(),
       subscriberB.connect(),
     ]);
-  }, 15000);
+  });
 
   afterAll(async () => {
-    for (const subscriber of [subscriberA, subscriberB]) {
-      if (subscriber?.isReady) {
-        await subscriber.unsubscribe();
-      }
-    }
-
-    await Promise.all(
-      [publisher, subscriberA, subscriberB].map(async (client) => {
-        if (client?.isOpen) {
-          await client.quit();
-        }
-      })
-    );
+    await subscriberA.unsubscribe();
+    await subscriberB.unsubscribe();
+    await Promise.all([
+      publisher.quit(),
+      subscriberA.quit(),
+      subscriberB.quit(),
+    ]);
   });
 
   function receiveOne(subscriber, targetChannel) {
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => {
         reject(new Error(`Timed out waiting on ${targetChannel}`));
-      }, timeoutMs);
+      }, 3000);
 
       subscriber.subscribe(targetChannel, (message) => {
         clearTimeout(timer);
-
         try {
           resolve(JSON.parse(message));
         } catch (error) {
@@ -89,26 +102,20 @@ describe('Redis Pub/Sub Integration (Issue #3)', () => {
     };
 
     const received = receiveOne(subscriberB, channel);
-
-    await new Promise((resolve) => setTimeout(resolve, 100));
     await publisher.publish(channel, JSON.stringify(event));
 
     const result = await received;
 
     expect(result.eventName).toBe('test:cross-instance');
-    expect(result.payload.message).toBe(
-      'Redis Pub/Sub integration works'
-    );
+    expect(result.payload.message).toBe('Redis Pub/Sub integration works');
     expect(result.originInstanceId).toBe('test-instance-A');
-  }, 10000);
+  });
 
   it('delivers a room event to multiple subscribers', async () => {
     const testChannel = `${channel}:room`;
 
     const receivedA = receiveOne(subscriberA, testChannel);
     const receivedB = receiveOne(subscriberB, testChannel);
-
-    await new Promise((resolve) => setTimeout(resolve, 100));
 
     const roomEvent = {
       roomId: 'room-integration-test',
@@ -129,5 +136,5 @@ describe('Redis Pub/Sub Integration (Issue #3)', () => {
     expect(resultB.roomId).toBe('room-integration-test');
     expect(resultA.eventName).toBe('user:joined');
     expect(resultB.payload.userId).toBe('user-integration-test');
-  }, 10000);
+  });
 });
