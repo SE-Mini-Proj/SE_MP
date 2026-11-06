@@ -1,4 +1,5 @@
 const db = require('../db');
+const logger = require('../services/loggerService');
 
 /**
  * Room Model & Database Repository
@@ -46,10 +47,9 @@ class RoomModel {
       try {
         await client.query('ROLLBACK');
       } catch (rollbackError) {
-        console.error(
-          '[Room Model] Failed to roll back room creation:',
-          rollbackError.message
-        );
+        logger.error('database.room_rollback_failed', 'Failed to roll back room creation', {
+          errorMessage: rollbackError.message,
+        });
       }
 
       throw error;

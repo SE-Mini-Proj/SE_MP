@@ -1,5 +1,6 @@
 
 const { getRedisClient } = require('./redisClient');
+const logger = require('../services/loggerService');
 
 const SESSION_PREFIX = 'chat:session:';
 const USER_SESSIONS_PREFIX = 'chat:user:sessions:';
@@ -44,10 +45,10 @@ async function getUserSessions(userId) {
     try {
       sessions.push(JSON.parse(sessionData));
     } catch (error) {
-      console.error(
-        `[Presence] Invalid session data for socket ${socketId}:`,
-        error.message
-      );
+      logger.error('presence.invalid_session', 'Invalid session data encountered', {
+        socketId,
+        errorMessage: error.message,
+      });
 
       await redis.del(sessionKey);
       await redis.sRem(userSessionsKey, socketId);

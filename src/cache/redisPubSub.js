@@ -1,5 +1,6 @@
 
 const { randomUUID } = require('crypto');
+const logger = require('../services/loggerService');
 const {
   getPublisherClient,
   getSubscriberClient,
@@ -67,10 +68,10 @@ async function initializePubSub(handler) {
       try {
         event = JSON.parse(message);
       } catch (error) {
-        console.error(
-          `[Redis Pub/Sub] Invalid JSON received on ${channel}:`,
-          error.message
-        );
+        logger.error('redis.pubsub_invalid_message', 'Invalid JSON received on Redis Pub/Sub channel', {
+          channel,
+          errorMessage: error.message,
+        });
         return;
       }
 
@@ -80,17 +81,17 @@ async function initializePubSub(handler) {
 
       if (eventHandler) {
         Promise.resolve(eventHandler(channel, event)).catch((error) => {
-          console.error(
-            `[Redis Pub/Sub] Event handler failed for ${channel}:`,
-            error.message
-          );
+          logger.error('redis.pubsub_handler_failed', 'Redis Pub/Sub event handler failed', {
+            channel,
+            errorMessage: error.message,
+          });
         });
       }
     });
   }
 
   initialized = true;
-  console.log('[Redis Pub/Sub] Subscribed to all application channels');
+  logger.info('redis.pubsub_subscribed', 'Subscribed to all application channels', { channels: Object.values(CHANNELS) });
 }
 
 async function closePubSub() {

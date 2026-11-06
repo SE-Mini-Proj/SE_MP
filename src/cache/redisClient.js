@@ -1,5 +1,6 @@
 const { createClient } = require('redis');
 const config = require('../config');
+const logger = require('../services/loggerService');
 
 let redisClient = null;
 let publisherClient = null;
@@ -18,9 +19,10 @@ function createRedisClient(clientName) {
 
       reconnectStrategy(retries) {
         if (retries > MAX_RETRIES) {
-          console.error(
-            `[Redis] ${clientName}: Maximum reconnection attempts reached`
-          );
+          logger.error('redis.reconnection_failed', 'Maximum reconnection attempts reached', {
+            clientName,
+            retries,
+          });
 
           return new Error('Maximum Redis reconnection attempts reached');
         }
@@ -30,9 +32,11 @@ function createRedisClient(clientName) {
           MAX_RETRY_DELAY_MS
         );
 
-        console.warn(
-          `[Redis] ${clientName}: Reconnecting in ${delay}ms (attempt ${retries})`
-        );
+        logger.warn('redis.reconnecting', 'Redis reconnection scheduled', {
+          clientName,
+          delayMs: delay,
+          attempt: retries,
+        });
 
         return delay;
       },
@@ -40,23 +44,27 @@ function createRedisClient(clientName) {
   });
 
   client.on('error', (error) => {
-    console.error(`[Redis] ${clientName} error:`, error.message);
+    logger.error('redis.error', 'Redis client error', {
+      clientName,
+      errorName: error.name,
+      errorMessage: error.message,
+    });
   });
 
   client.on('connect', () => {
-    console.log(`[Redis] ${clientName} connecting`);
+    logger.info('redis.connecting', 'Redis client connecting', { clientName });
   });
 
   client.on('ready', () => {
-    console.log(`[Redis] ${clientName} ready`);
+    logger.info('redis.ready', 'Redis client ready', { clientName });
   });
 
   client.on('reconnecting', () => {
-    console.warn(`[Redis] ${clientName} reconnecting`);
+    logger.warn('redis.reconnecting', 'Redis client reconnecting', { clientName });
   });
 
   client.on('end', () => {
-    console.log(`[Redis] ${clientName} connection closed`);
+    logger.info('redis.disconnected', 'Redis client connection closed', { clientName });
   });
 
   return client;

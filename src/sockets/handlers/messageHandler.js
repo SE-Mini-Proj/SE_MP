@@ -1,4 +1,5 @@
 const messagingService = require('../../services/messagingService');
+const logger = require('../../services/loggerService');
 const { isUserOnline } = require('../../cache/presenceService');
 const { publishMessage } = require('../../cache/redisPubSub');
 const { enqueueOfflineMessage } = require('../../services/offlineMessageService');
@@ -68,10 +69,10 @@ function registerMessageHandler(io, socket, stopTyping = () => {}) {
         try {
           await notifyUser(recipientId, message);
         } catch (notificationError) {
-          console.error(
-            '[Notifications] Failed to send direct-message push:',
-            notificationError.message
-          );
+          logger.error('notification.push_failed', 'Failed to send direct-message push notification', {
+            errorMessage: notificationError.message,
+            recipientId,
+          });
         }
 
         const recipientOnline = await isUserOnline(recipientId);
@@ -92,10 +93,10 @@ function registerMessageHandler(io, socket, stopTyping = () => {}) {
       try {
         await publishMessage(message);
       } catch (redisError) {
-        console.error(
-          '[Messaging] Redis publish failed after local delivery:',
-          redisError.message
-        );
+        logger.error('messaging.redis_publish_failed', 'Redis publish failed after local message delivery', {
+          errorMessage: redisError.message,
+          messageId: message.messageId,
+        });
       }
 
       // AC-CHAT-F-040: Every delivered message has a persisted record before acknowledgment

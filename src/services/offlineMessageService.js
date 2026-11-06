@@ -1,4 +1,5 @@
 const { getRedisClient } = require('../cache/redisClient');
+const logger = require('./loggerService');
 
 const QUEUE_PREFIX = 'chat:offline-messages:';
 
@@ -40,10 +41,10 @@ async function drainOfflineMessages(recipientId) {
     try {
       messages.push(JSON.parse(serializedMessage));
     } catch (error) {
-      console.error(
-        `[Messaging] Invalid queued message for recipient ${recipientId}:`,
-        error.message
-      );
+      logger.error('messaging.invalid_queued_message', 'Invalid serialized offline message encountered', {
+        recipientId,
+        errorMessage: error.message,
+      });
       throw error;
     }
   }

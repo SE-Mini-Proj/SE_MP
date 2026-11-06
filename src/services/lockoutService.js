@@ -8,6 +8,7 @@
 
 const MAX_FAILED_ATTEMPTS = 5;
 const LOCKOUT_DURATION_MS = 5 * 60 * 1000; // 5 minutes
+const logger = require('./loggerService');
 
 // In-memory store: identifier -> { failedAttempts: number, lockedUntil: number | null }
 const attemptsStore = new Map();
@@ -20,10 +21,7 @@ const attemptsStore = new Map();
  * @param {object} details - Event metadata
  */
 function recordAuditLog(event, details) {
-  const timestamp = new Date().toISOString();
-  console.warn(
-    `[Audit Log] [${timestamp}] Event: ${event} | Details: ${JSON.stringify(details)}`
-  );
+  logger.warn(event, 'Authentication security event', details);
 }
 
 /**

@@ -1,23 +1,26 @@
+const logger = require('../services/loggerService');
+
 /**
- * Structured request logger middleware
- * Logs method, path, IP, timestamp and duration without exposing sensitive payloads.
+ * Structured HTTP request logger.
+ * Does not log request bodies, headers, or query parameters.
  */
 function requestLogger(req, res, next) {
   const start = Date.now();
+
   res.on('finish', () => {
-    const duration = Date.now() - start;
-    const logData = {
-      timestamp: new Date().toISOString(),
-      method: req.method,
-      url: req.originalUrl || req.url,
-      status: res.statusCode,
-      durationMs: duration,
-      ip: req.ip,
-    };
-    if (process.env.NODE_ENV !== 'test') {
-      console.log(JSON.stringify(logData));
+    if (process.env.NODE_ENV === 'test') {
+      return;
     }
+
+    logger.info('http.request', 'HTTP request completed', {
+      method: req.method,
+      path: req.path,
+      status: res.statusCode,
+      durationMs: Date.now() - start,
+      ip: req.ip,
+    });
   });
+
   next();
 }
 

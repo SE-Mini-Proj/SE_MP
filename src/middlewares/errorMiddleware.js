@@ -1,5 +1,7 @@
+const logger = require('../services/loggerService');
+
 /**
- * Standardized error handling middleware
+ * Standardized error handling middleware.
  * Enforces the SAD Section 4.4 error envelope specification:
  * { "code": string, "message": string }
  */
@@ -23,7 +25,14 @@ function errorHandler(err, req, res, _next) {
   const errorMessage = err.message || 'An unexpected error occurred';
 
   if (process.env.NODE_ENV !== 'test' && statusCode >= 500) {
-    console.error(`[Error] ${errorCode}:`, err.stack || err);
+    logger.error('http.error', 'HTTP request failed', {
+      statusCode,
+      errorCode,
+      errorName: err.name,
+      errorMessage,
+      method: req.method,
+      path: req.path,
+    });
   }
 
   res.status(statusCode).json({

@@ -15,6 +15,7 @@ const {
   drainOfflineMessages,
 } = require('../../services/offlineMessageService');
 const messagingService = require('../../services/messagingService');
+const logger = require('../../services/loggerService');
 
 const TYPING_TIMEOUT_MS = 3000;
 
@@ -38,10 +39,10 @@ function registerPresenceHandler(io, socket) {
         payload,
       })
     ).catch((error) => {
-      console.error(
-        '[Presence] Failed to publish typing event:',
-        error.message
-      );
+      logger.error('presence.typing_publish_failed', 'Failed to publish typing event', {
+        roomId,
+        errorMessage: error.message,
+      });
     });
   }
 
@@ -80,17 +81,17 @@ function registerPresenceHandler(io, socket) {
           try {
             await publishMessage(message);
           } catch (error) {
-            console.error(
-              '[Messaging] Queued message was delivered locally but Redis publish failed:',
-              error.message
-            );
+            logger.error('messaging.queued_publish_failed', 'Queued message delivered locally but Redis publish failed', {
+              messageId: message.messageId || message.id,
+              errorMessage: error.message,
+            });
           }
         }
       } catch (error) {
-        console.error(
-          `[Messaging] Failed to drain offline messages for ${userId}:`,
-          error.message
-        );
+        logger.error('messaging.offline_drain_failed', 'Failed to drain offline messages', {
+          userId,
+          errorMessage: error.message,
+        });
       }
 
       if (session.isFirstSession) {
@@ -104,10 +105,10 @@ function registerPresenceHandler(io, socket) {
       }
     })
     .catch((error) => {
-      console.error(
-        '[Presence] Failed to register session:',
-        error.message
-      );
+      logger.error('presence.session_registration_failed', 'Failed to register presence session', {
+        userId,
+        errorMessage: error.message,
+      });
     });
 
   socket.on('room:join', async ({ roomId } = {}, callback) => {
@@ -141,10 +142,11 @@ function registerPresenceHandler(io, socket) {
         payload,
       });
     } catch (error) {
-      console.error(
-        '[Presence] Failed to publish room join:',
-        error.message
-      );
+      logger.error('presence.room_join_publish_failed', 'Failed to publish room join event', {
+        roomId,
+        userId,
+        errorMessage: error.message,
+      });
     }
 
     if (typeof callback === 'function') {
@@ -186,10 +188,11 @@ function registerPresenceHandler(io, socket) {
         payload,
       });
     } catch (error) {
-      console.error(
-        '[Presence] Failed to publish room leave:',
-        error.message
-      );
+      logger.error('presence.room_leave_publish_failed', 'Failed to publish room leave event', {
+        roomId,
+        userId,
+        errorMessage: error.message,
+      });
     }
 
     if (typeof callback === 'function') {
@@ -246,10 +249,11 @@ function registerPresenceHandler(io, socket) {
         });
       }
     } catch (error) {
-      console.error(
-        '[Presence] Failed to clean up session:',
-        error.message
-      );
+      logger.error('presence.session_cleanup_failed', 'Failed to clean up presence session', {
+        userId,
+        socketId: socket.id,
+        errorMessage: error.message,
+      });
     }
   });
 

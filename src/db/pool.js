@@ -1,5 +1,6 @@
 const { Pool } = require('pg');
 const config = require('../config');
+const logger = require('../services/loggerService');
 
 let poolInstance = null;
 
@@ -34,7 +35,11 @@ function getPool() {
     poolInstance = new Pool(createPoolConfig());
 
     poolInstance.on('error', (err) => {
-      console.error('[PostgreSQL Pool Error] Unexpected idle client error:', err);
+      logger.error('database.pool_error', 'Unexpected idle database client error', {
+        errorName: err.name,
+        errorCode: err.code,
+        errorMessage: err.message,
+      });
     });
   }
   return poolInstance;
@@ -53,11 +58,18 @@ async function query(text, params) {
     const res = await pool.query(text, params);
     const duration = Date.now() - start;
     if (config.nodeEnv === 'development' && process.env.DEBUG_SQL === 'true') {
-      console.log(`[SQL Query] duration=${duration}ms rows=${res.rowCount}`);
+      logger.info('database.query', 'Database query completed', {
+        durationMs: duration,
+        rowCount: res.rowCount,
+      });
     }
     return res;
   } catch (err) {
-    console.error(`[SQL Error] Failed to execute query: "${text.substring(0, 80)}..."`, err.message);
+    logger.error('database.query_failed', 'Database query failed', {
+      errorName: err.name,
+      errorCode: err.code,
+      errorMessage: err.message,
+    });
     throw err;
   }
 }
