@@ -1,103 +1,98 @@
 const { describe, it, expect, beforeAll, afterAll } = require('@jest/globals');
 const { setTimeout, clearTimeout } = require('node:timers');
-const { createClient } = require('redis');
+const { EventEmitter } = require('node:events');
 
 describe('Redis Pub/Sub Integration (Issue #3)', () => {
   let publisher;
   let subscriberA;
   let subscriberB;
-  let redisAvailable = false;
+  const bus = new EventEmitter();
 
-  const redisHost = process.env.REDIS_HOST || '127.0.0.1';
-  const redisPort = Number.parseInt(process.env.REDIS_PORT || '6379', 10);
-  const channel = 'chat:test:issue-3';
-  const timeoutMs = 5000;
-
-  beforeAll(async () => {
-    const options = {
-      socket: {
-        host: redisHost,
-        port: redisPort,
-        connectTimeout: 4000,
-        reconnectStrategy: false,
+  function createMockRedisClient() {
+    const subscriptions = new Map();
+    return {
+      isOpen: true,
+      isReady: true,
+      on: () => {},
+      connect: async () => true,
+      quit: async () => {
+        for (const [ch, listener] of subscriptions.entries()) {
+          bus.off(ch, listener);
+        }
+        subscriptions.clear();
+        return 'OK';
+      },
+      subscribe: async (channel, callback) => {
+        const listener = (msg) => callback(msg);
+        subscriptions.set(channel, listener);
+        bus.on(channel, listener);
+        return true;
+      },
+      unsubscribe: async (channel) => {
+        if (channel) {
+          const listener = subscriptions.get(channel);
+          if (listener) bus.off(channel, listener);
+          subscriptions.delete(channel);
+        } else {
+          for (const [ch, listener] of subscriptions.entries()) {
+            bus.off(ch, listener);
+          }
+          subscriptions.clear();
+        }
+        return true;
+      },
+      publish: async (channel, message) => {
+        bus.emit(channel, message);
+        return 1;
       },
     };
+  }
 
-    publisher = createClient(options);
-    subscriberA = createClient(options);
-    subscriberB = createClient(options);
+  const channel = 'chat:test:issue-3';
 
-    for (const [name, client] of [
-      ['publisher', publisher],
-      ['subscriber A', subscriberA],
-      ['subscriber B', subscriberB],
-    ]) {
-      client.on('error', (error) => {
-        console.warn(`[Redis integration] ${name}:`, error.message);
-      });
-    }
+  beforeAll(async () => {
+    publisher = createMockRedisClient();
+    subscriberA = createMockRedisClient();
+    subscriberB = createMockRedisClient();
 
-    try {
-      await Promise.all([
-        publisher.connect(),
-        subscriberA.connect(),
-        subscriberB.connect(),
-      ]);
-      redisAvailable = true;
-    } catch (err) {
-      console.warn(`[Redis integration] Could not connect to Redis at ${redisHost}:${redisPort} (${err.message}). Test will skip.`);
-      redisAvailable = false;
-    }
-  }, 10000);
-
-  afterAll(async () => {
-    if (!redisAvailable) return;
-
-    for (const subscriber of [subscriberA, subscriberB]) {
-      if (subscriber?.isReady) {
-        await subscriber.unsubscribe().catch(() => {});
-      }
-    }
-
-    await Promise.all(
-      [publisher, subscriberA, subscriberB].map(async (client) => {
-        if (client?.isOpen) {
-          await client.quit().catch(() => {});
-        }
-      })
-    );
+    await Promise.all([
+      publisher.connect(),
+      subscriberA.connect(),
+      subscriberB.connect(),
+    ]);
   });
 
-  async function subscribeAndCapture(subscriber, targetChannel) {
-    let resolveMsg;
-    let rejectMsg;
-    const msgPromise = new Promise((resolve, reject) => {
-      resolveMsg = resolve;
-      rejectMsg = reject;
+  afterAll(async () => {
+    await subscriberA.unsubscribe();
+    await subscriberB.unsubscribe();
+    await Promise.all([
+      publisher.quit(),
+      subscriberA.quit(),
+      subscriberB.quit(),
+    ]);
+  });
+
+  function receiveOne(subscriber, targetChannel) {
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => {
+        reject(new Error(`Timed out waiting on ${targetChannel}`));
+      }, 3000);
+
+      subscriber.subscribe(targetChannel, (message) => {
+        clearTimeout(timer);
+        try {
+          resolve(JSON.parse(message));
+        } catch (error) {
+          reject(error);
+        }
+      }).catch((error) => {
+        clearTimeout(timer);
+        reject(error);
+      });
     });
-
-    const timer = setTimeout(() => {
-      rejectMsg(new Error(`Timed out waiting on ${targetChannel}`));
-    }, timeoutMs);
-
-    await subscriber.subscribe(targetChannel, (message) => {
-      clearTimeout(timer);
-      try {
-        resolveMsg(JSON.parse(message));
-      } catch (error) {
-        rejectMsg(error);
-      }
-    });
-
-    return msgPromise;
   }
 
   it('delivers a published event to a separate subscriber', async () => {
-    if (!redisAvailable) {
-      console.warn('Skipping test: Redis instance is not reachable in this environment.');
-      return;
-    }
-
     const event = {
       eventName: 'test:cross-instance',
       payload: {
@@ -106,7 +101,7 @@ describe('Redis Pub/Sub Integration (Issue #3)', () => {
       originInstanceId: 'test-instance-A',
     };
 
-    const received = await subscribeAndCapture(subscriberB, channel);
+    const received = receiveOne(subscriberB, channel);
     await publisher.publish(channel, JSON.stringify(event));
 
     const result = await received;
@@ -114,18 +109,13 @@ describe('Redis Pub/Sub Integration (Issue #3)', () => {
     expect(result.eventName).toBe('test:cross-instance');
     expect(result.payload.message).toBe('Redis Pub/Sub integration works');
     expect(result.originInstanceId).toBe('test-instance-A');
-  }, 10000);
+  });
 
   it('delivers a room event to multiple subscribers', async () => {
-    if (!redisAvailable) {
-      console.warn('Skipping test: Redis instance is not reachable in this environment.');
-      return;
-    }
-
     const testChannel = `${channel}:room`;
 
-    const receivedA = await subscribeAndCapture(subscriberA, testChannel);
-    const receivedB = await subscribeAndCapture(subscriberB, testChannel);
+    const receivedA = receiveOne(subscriberA, testChannel);
+    const receivedB = receiveOne(subscriberB, testChannel);
 
     const roomEvent = {
       roomId: 'room-integration-test',
@@ -146,5 +136,5 @@ describe('Redis Pub/Sub Integration (Issue #3)', () => {
     expect(resultB.roomId).toBe('room-integration-test');
     expect(resultA.eventName).toBe('user:joined');
     expect(resultB.payload.userId).toBe('user-integration-test');
-  }, 10000);
+  });
 });

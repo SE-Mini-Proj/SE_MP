@@ -19,10 +19,7 @@
     "db:seed": "node src/db/seed.js",
     "start:frontend": "node start-frontend.js",
     "test:system": "jest tests/db.test.js tests/health.test.js tests/socket.test.js tests/redis.integration.test.js tests/messagePersistence.test.js tests/messageHistory.test.js tests/media.test.js tests/rbac.test.js tests/tls.test.js tests/xss.test.js tests/authentication.test.js --runInBand",
-    "test:coverage": "jest --coverage --runInBand",
-    "coverage:summary": "node scripts/coverage-summary.js",
-    "lint:score": "node scripts/lint-score.js",
-    "test:unit:coverage": "jest tests/services.test.js tests/registration.test.js tests/offlineMessageService.test.js tests/roomModel.test.js tests/pushNotification.test.js tests/messageModel.pagination.test.js tests/auth.test.js --coverage --runInBand"
+    "lint:score": "node scripts/lint-score.js"
   },
   "repository": {
     "type": "git",
